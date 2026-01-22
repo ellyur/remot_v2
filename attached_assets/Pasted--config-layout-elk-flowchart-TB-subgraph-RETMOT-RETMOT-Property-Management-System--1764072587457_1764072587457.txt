@@ -1,0 +1,66 @@
+---
+config:
+  layout: elk
+---
+flowchart TB
+ subgraph RETMOT["RETMOT Property Management System"]
+    direction TB
+        ViewDash["View Dashboard"]
+        ManageTenants["Manage Tenants<br>Add, Update, Delete"]
+        ApprovePayments["View/Approve Payments"]
+        UpdateMaintenance["View/Update Maintenance Requests"]
+        GenReports["Generate Reports"]
+        SignAgreement["Sign Rental Agreement<br>Kasunduan"]
+        ViewPersonalDash["View Personal Dashboard"]
+        SubmitPayment["Submit Payment<br>Upload Proof"]
+        ViewPays["View Payment History"]
+        SubmitMaintenance["Submit Maintenance Request"]
+        ViewMainStatus["View Maintenance Status"]
+        UpdateProfile["Update Profile"]
+        AuthLogin["Authenticate Login"]
+        PaymentMgmt["Payment Management"]
+        MaintenanceMgmt["Maintenance Management"]
+  end
+    Admin(["Admin<br>👤 Administrator"]) -- manages --> ManageTenants
+    Admin -- views --> ViewDash
+    Admin -- approves --> ApprovePayments
+    Admin -- updates --> UpdateMaintenance
+    Admin -- generates --> GenReports
+    Admin -- uses --> AuthLogin
+    Admin -- accesses --> PaymentMgmt & MaintenanceMgmt
+    Tenant(["Tenant<br>👤 User"]) -- signs --> SignAgreement
+    Tenant -- views --> ViewPersonalDash & ViewPays & ViewMainStatus
+    Tenant -- submits --> SubmitPayment & SubmitMaintenance
+    Tenant -- updates --> UpdateProfile
+    Tenant -- uses --> AuthLogin
+    Tenant -- accesses --> PaymentMgmt & MaintenanceMgmt
+    ManageTenants -. manages accounts .-> Tenant
+    SubmitPayment -. submits to .-> ApprovePayments
+    SubmitMaintenance -. submits to .-> UpdateMaintenance
+    AuthLogin -. sends notification .-> SMS[("SMS Service<br>📱")]
+    SubmitPayment -. sends receipt .-> SMS
+    SubmitMaintenance -. sends update .-> SMS
+    UpdateMaintenance -. sends status .-> SMS
+
+     ViewDash:::usecase
+     ManageTenants:::usecase
+     ApprovePayments:::usecase
+     UpdateMaintenance:::usecase
+     GenReports:::usecase
+     SignAgreement:::usecase
+     ViewPersonalDash:::usecase
+     SubmitPayment:::usecase
+     ViewPays:::usecase
+     SubmitMaintenance:::usecase
+     ViewMainStatus:::usecase
+     UpdateProfile:::usecase
+     AuthLogin:::shared
+     PaymentMgmt:::shared
+     MaintenanceMgmt:::shared
+     Admin:::actor
+     Tenant:::actor
+     SMS:::external
+    classDef actor fill:#4A90E2,stroke:#2E5C8A,stroke-width:3px,color:#fff
+    classDef usecase fill:#50C878,stroke:#247A43,stroke-width:2px,color:#fff
+    classDef shared fill:#f4d03f,stroke:#b7950b,stroke-width:2px,color:#000
+    classDef external fill:#bbb,stroke:#888,stroke-width:2px,color:#222

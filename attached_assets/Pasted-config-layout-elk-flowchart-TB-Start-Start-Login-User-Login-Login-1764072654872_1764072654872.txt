@@ -1,0 +1,108 @@
+config:
+  layout: elk
+---
+flowchart TB
+    Start([Start]) --> Login{User Login}
+    
+    Login -->|Admin| AdminDash[Admin Dashboard]
+    Login -->|Tenant| CheckKasunduan{Kasunduan<br/>Signed?}
+    
+    CheckKasunduan -->|No| SignKasunduan[Sign Rental Agreement]
+    SignKasunduan --> TenantDash[Tenant Dashboard]
+    CheckKasunduan -->|Yes| TenantDash
+    
+    %% Admin Flow
+    AdminDash --> AdminChoice{Choose Action}
+    AdminChoice -->|Manage Tenants| ViewTenants[View Tenant List]
+    ViewTenants --> TenantAction{Action}
+    TenantAction -->|Add| AddTenant[Add New Tenant]
+    TenantAction -->|Edit| EditTenant[Edit Tenant Info]
+    TenantAction -->|Delete| DeleteTenant[Delete Tenant]
+    AddTenant --> AdminDash
+    EditTenant --> AdminDash
+    DeleteTenant --> AdminDash
+    
+    AdminChoice -->|View Payments| ViewPaymentList[View Payment Requests]
+    ViewPaymentList --> PaymentAction{Action}
+    PaymentAction -->|Approve| ApprovePayment[Approve Payment]
+    ApprovePayment --> SendSMS1[Send SMS Notification]
+    SendSMS1 --> AdminDash
+    PaymentAction -->|Reject| RejectPayment[Reject Payment]
+    RejectPayment --> AdminDash
+    
+    AdminChoice -->|Maintenance| ViewMaintenanceList[View Maintenance Requests]
+    ViewMaintenanceList --> MaintenanceAction{Action}
+    MaintenanceAction -->|Update Status| UpdateStatus[Update Request Status]
+    UpdateStatus --> SendSMS2[Send SMS to Tenant]
+    SendSMS2 --> AdminDash
+    
+    AdminChoice -->|Reports| GenReport[Generate Report]
+    GenReport --> AdminDash
+    
+    AdminChoice -->|Logout| End([End])
+    
+    %% Tenant Flow
+    TenantDash --> TenantChoice{Choose Action}
+    
+    TenantChoice -->|Submit Payment| UploadProof[Upload Payment Proof]
+    UploadProof --> SavePayment[Save Payment Record]
+    SavePayment --> NotifyAdmin1[Notify Admin]
+    NotifyAdmin1 --> TenantDash
+    
+    TenantChoice -->|View Payments| ViewPaymentHistory[View Payment History]
+    ViewPaymentHistory --> TenantDash
+    
+    TenantChoice -->|Submit Maintenance| FillMaintenanceForm[Fill Maintenance Request]
+    FillMaintenanceForm --> SubmitMaintenance[Submit Request]
+    SubmitMaintenance --> NotifyAdmin2[Notify Admin]
+    NotifyAdmin2 --> TenantDash
+    
+    TenantChoice -->|View Maintenance| ViewMaintenanceStatus[View Request Status]
+    ViewMaintenanceStatus --> TenantDash
+    
+    TenantChoice -->|Update Profile| EditProfile[Edit Profile Info]
+    EditProfile --> SaveProfile[Save Changes]
+    SaveProfile --> TenantDash
+    
+    TenantChoice -->|Logout| End
+    
+    %% Styling
+    Start:::startEnd
+    End:::startEnd
+    Login:::decision
+    CheckKasunduan:::decision
+    AdminChoice:::decision
+    TenantChoice:::decision
+    TenantAction:::decision
+    PaymentAction:::decision
+    MaintenanceAction:::decision
+    AdminDash:::process
+    TenantDash:::process
+    SignKasunduan:::process
+    ViewTenants:::process
+    AddTenant:::process
+    EditTenant:::process
+    DeleteTenant:::process
+    ViewPaymentList:::process
+    ApprovePayment:::process
+    RejectPayment:::process
+    ViewMaintenanceList:::process
+    UpdateStatus:::process
+    GenReport:::process
+    UploadProof:::process
+    SavePayment:::process
+    ViewPaymentHistory:::process
+    FillMaintenanceForm:::process
+    SubmitMaintenance:::process
+    ViewMaintenanceStatus:::process
+    EditProfile:::process
+    SaveProfile:::process
+    SendSMS1:::notification
+    SendSMS2:::notification
+    NotifyAdmin1:::notification
+    NotifyAdmin2:::notification
+    
+    classDef startEnd fill:#4A90E2,stroke:#2E5C8A,stroke-width:2px,color:#fff
+    classDef process fill:#50C878,stroke:#247A43,stroke-width:2px,color:#fff
+    classDef decision fill:#f4d03f,stroke:#b7950b,stroke-width:2px,color:#000
+    classDef notification fill:#E74C3C,stroke:#C0392B,stroke-width:2px,color:#fff

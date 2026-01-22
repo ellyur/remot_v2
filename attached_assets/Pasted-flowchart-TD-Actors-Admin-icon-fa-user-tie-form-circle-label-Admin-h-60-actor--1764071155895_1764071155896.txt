@@ -1,0 +1,76 @@
+flowchart TD
+  %% Actors
+  Admin@{icon:"fa:user-tie", form:"circle", label:"Admin", h:60}:::actor
+  Tenant@{icon:"fa:user", form:"circle", label:"Tenant", h:60}:::actor
+  SMS[("SMS Service")]:::external
+
+  %% System boundary
+  subgraph RETMOT System
+    direction TB
+
+    %% Admin Use Cases
+    ViewDash["View Dashboard"]:::usecase
+    ManageTenants["Manage Tenants <br/>(Add, Update, Delete)"]:::usecase
+    ApprovePayments["View/Approve Payments"]:::usecase
+    UpdateMaintenance["View/Update Maintenance Requests"]:::usecase
+    GenReports["Generate Reports"]:::usecase
+
+    %% Tenant Use Cases
+    SignAgreement["Sign Rental Agreement <br/>(Kasunduan)"]:::usecase
+    ViewPersonalDash["View Personal Dashboard"]:::usecase
+    SubmitPayment["Submit Payment <br/>(Upload Proof)"]:::usecase
+    ViewPays["View Payment History"]:::usecase
+    SubmitMaintenance["Submit Maintenance Request"]:::usecase
+    ViewMainStatus["View Maintenance Status"]:::usecase
+    UpdateProfile["Update Profile"]:::usecase
+
+    %% Shared
+    AuthLogin["Authenticate (Login)"]:::shared
+    PaymentMgmt["Payment Management"]:::shared
+    MaintenanceMgmt["Maintenance Management"]:::shared
+  end
+
+  %% Admin associations
+  Admin -- "manages" --> ManageTenants
+  Admin -- "views" --> ViewDash
+  Admin -- "approves" --> ApprovePayments
+  Admin -- "updates" --> UpdateMaintenance
+  Admin -- "generates" --> GenReports
+  Admin -- "uses" --> AuthLogin
+  Admin -- "accesses" --> PaymentMgmt
+  Admin -- "accesses" --> MaintenanceMgmt
+
+  %% Tenant associations
+  Tenant -- "signs" --> SignAgreement
+  Tenant -- "views" --> ViewPersonalDash
+  Tenant -- "submits" --> SubmitPayment
+  Tenant -- "views" --> ViewPays
+  Tenant -- "submits" --> SubmitMaintenance
+  Tenant -- "views" --> ViewMainStatus
+  Tenant -- "updates" --> UpdateProfile
+  Tenant -- "uses" --> AuthLogin
+  Tenant -- "accesses" --> PaymentMgmt
+  Tenant -- "accesses" --> MaintenanceMgmt
+
+  %% Special Relationships
+  ManageTenants -- "manages accounts" --> Tenant
+  SubmitPayment -- "submits to" --> ApprovePayments
+  SubmitMaintenance -- "submits to" --> UpdateMaintenance
+
+  %% System sends sms
+  AuthLogin -- "sends notification" --> SMS
+  SubmitPayment -- "sends receipt" --> SMS
+  SubmitMaintenance -- "sends update" --> SMS
+  UpdateMaintenance -- "sends status" --> SMS
+
+  %% Use case boundaries
+  classDef actor fill:#4A90E2,stroke:#2E5C8A,stroke-width:2px,color:#fff;
+  classDef usecase fill:#50C878,stroke:#247A43,stroke-width:2px,color:#fff;
+  classDef shared fill:#f4d03f,stroke:#b7950b,stroke-width:2px,color:#000;
+  classDef external fill:#bbb,stroke:#888,stroke-width:2px,color:#222;
+
+  class Admin,Tenant actor;
+  class SMS external;
+  class ManageTenants,ViewDash,ApprovePayments,UpdateMaintenance,GenReports usecase;
+  class SignAgreement,ViewPersonalDash,SubmitPayment,ViewPays,SubmitMaintenance,ViewMainStatus,UpdateProfile usecase;
+  class AuthLogin,PaymentMgmt,MaintenanceMgmt shared;

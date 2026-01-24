@@ -24,6 +24,9 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+// Attached assets directory for static files
+const attachedAssetsDir = path.join(process.cwd(), "attached_assets");
+
 // Configure multer for file uploads
 const storageConfig = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -62,6 +65,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/uploads", (req, res, next) => {
     const filePath = path.join(uploadsDir, req.path);
     res.sendFile(filePath);
+  });
+
+  // Serve attached assets (for GCash QR codes, etc.)
+  app.use("/attached_assets", (req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    const filePath = path.join(attachedAssetsDir, req.path);
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      res.status(404).json({ message: "File not found" });
+    }
   });
 
   // Authentication

@@ -46,3 +46,6 @@ expertMode = true
 
 [userenv.shared]
 PHILSMS_API_TOKEN = "464|ijNUMQSO7hrR4NU7B6XFQXltuQTZA6PUQkJg3H9w4cfe0ed9"
+
+[userenv.production]
+NODE_ENV = "production"

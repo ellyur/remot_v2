@@ -3,17 +3,18 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, Trash2, User } from "lucide-react";
+import { Plus, Pencil, Trash2, User, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import type { Tenant } from "@shared/schema";
+import type { Tenant, Unit } from "@shared/schema";
 
 const tenantSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
@@ -25,8 +26,6 @@ const tenantSchema = z.object({
   rentAmount: z.string().min(1, "Rent amount is required"),
   emergencyContact: z.string().optional(),
 }).refine((data) => {
-  // Password is required when creating (username is filled and not disabled)
-  // Password is optional when editing (can be empty)
   if (data.password.length > 0 && data.password.length < 6) {
     return false;
   }
@@ -40,12 +39,33 @@ type TenantFormData = z.infer<typeof tenantSchema>;
 
 export default function Tenants() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isUnitOpen, setIsUnitOpen] = useState(false);
+  const [newUnitId, setNewUnitId] = useState("");
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const { toast } = useToast();
 
   const { data: tenants, isLoading } = useQuery<Tenant[]>({
     queryKey: ["/api/tenants"],
+  });
+
+  const { data: units } = useQuery<Unit[]>({
+    queryKey: ["/api/units"],
+  });
+
+  const createUnitMutation = useMutation({
+    mutationFn: async (unitId: string) => {
+      return await apiRequest("POST", "/api/units", { unitId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/units"] });
+      toast({ title: "Unit created successfully" });
+      setIsUnitOpen(false);
+      setNewUnitId("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
   const form = useForm<TenantFormData>({
@@ -69,6 +89,7 @@ export default function Tenants() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tenants"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/units"] });
       toast({ title: "Tenant created successfully" });
       setIsOpen(false);
       form.reset();
@@ -101,6 +122,7 @@ export default function Tenants() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tenants"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/units"] });
       toast({ title: "Tenant deleted successfully" });
       setDeleteId(null);
     },
@@ -134,7 +156,6 @@ export default function Tenants() {
     if (editingTenant) {
       updateMutation.mutate({ ...data, id: editingTenant.id });
     } else {
-      // Validate password is provided when creating
       if (!data.password || data.password.length < 6) {
         form.setError("password", {
           type: "manual",
@@ -155,167 +176,218 @@ export default function Tenants() {
             Manage tenant accounts and information
           </p>
         </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-add-tenant">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Tenant
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editingTenant ? "Edit Tenant" : "Add New Tenant"}</DialogTitle>
-              <DialogDescription>
-                {editingTenant ? "Update tenant information" : "Create a new tenant account"}
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+        <div className="flex gap-2">
+          <Dialog open={isUnitOpen} onOpenChange={setIsUnitOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" data-testid="button-add-unit">
+                <Building className="h-4 w-4 mr-2" />
+                Add Unit
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Unit</DialogTitle>
+                <DialogDescription>Create a new unit ID for tenants</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <FormLabel>Unit ID</FormLabel>
+                  <Input 
+                    placeholder="e.g. Unit 101" 
+                    value={newUnitId} 
+                    onChange={(e) => setNewUnitId(e.target.value)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsUnitOpen(false)}>Cancel</Button>
+                <Button 
+                  onClick={() => createUnitMutation.mutate(newUnitId)}
+                  disabled={!newUnitId || createUnitMutation.isPending}
+                >
+                  Create Unit
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-tenant">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Tenant
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingTenant ? "Edit Tenant" : "Add New Tenant"}</DialogTitle>
+                <DialogDescription>
+                  {editingTenant ? "Update tenant information" : "Create a new tenant account"}
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="username"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Username</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Username"
+                              disabled={!!editingTenant}
+                              data-testid="input-username"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="password"
+                              placeholder={editingTenant ? "Leave empty to keep current" : "Password"}
+                              data-testid="input-password"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <FormField
                     control={form.control}
-                    name="username"
+                    name="fullName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Username</FormLabel>
+                        <FormLabel>Full Name</FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder="Username"
+                          <Input placeholder="Full Name" data-testid="input-full-name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="contact"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Contact Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="09xxxxxxxxx" data-testid="input-contact" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="unitId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Unit ID</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            defaultValue={field.value}
                             disabled={!!editingTenant}
-                            data-testid="input-username"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-unit-id">
+                                <SelectValue placeholder="Select unit" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {units?.filter(u => u.status === "available" || u.unitId === editingTenant?.unitId).map((unit) => (
+                                <SelectItem key={unit.id} value={unit.unitId}>
+                                  {unit.unitId}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="occupation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Occupation (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Occupation" data-testid="input-occupation" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="rentAmount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Monthly Rent Amount</FormLabel>
+                          <FormControl>
+                            <Input placeholder="5000.00" data-testid="input-rent-amount" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <FormField
                     control={form.control}
-                    name="password"
+                    name="emergencyContact"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Password</FormLabel>
+                        <FormLabel>Emergency Contact (Optional)</FormLabel>
                         <FormControl>
-                          <Input
-                            type="password"
-                            placeholder={editingTenant ? "Leave empty to keep current" : "Password"}
-                            data-testid="input-password"
-                            {...field}
-                          />
+                          <Input placeholder="Emergency contact number" data-testid="input-emergency-contact" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </div>
 
-                <FormField
-                  control={form.control}
-                  name="fullName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Full Name" data-testid="input-full-name" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="contact"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Contact Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="09xxxxxxxxx" data-testid="input-contact" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="unitId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Unit ID</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Unit number" data-testid="input-unit-id" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="occupation"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Occupation (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Occupation" data-testid="input-occupation" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="rentAmount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Monthly Rent Amount</FormLabel>
-                        <FormControl>
-                          <Input placeholder="5000.00" data-testid="input-rent-amount" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="emergencyContact"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Emergency Contact (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Emergency contact number" data-testid="input-emergency-contact" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={handleClose}>
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                    data-testid="button-save-tenant"
-                  >
-                    {createMutation.isPending || updateMutation.isPending
-                      ? "Saving..."
-                      : editingTenant
-                      ? "Update Tenant"
-                      : "Create Tenant"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={handleClose}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createMutation.isPending || updateMutation.isPending}
+                      data-testid="button-save-tenant"
+                    >
+                      {createMutation.isPending || updateMutation.isPending
+                        ? "Saving..."
+                        : editingTenant
+                        ? "Update Tenant"
+                        : "Create Tenant"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card>

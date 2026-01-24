@@ -6,7 +6,17 @@ import bcrypt from "bcryptjs";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { insertUserSchema, insertTenantSchema, insertPaymentSchema, insertMaintenanceReportSchema, type Tenant, type Payment, type MaintenanceReport } from "@shared/schema";
+import { 
+  insertUserSchema, 
+  insertTenantSchema, 
+  insertPaymentSchema, 
+  insertMaintenanceReportSchema, 
+  insertUnitSchema,
+  type Tenant, 
+  type Payment, 
+  type MaintenanceReport,
+  type Unit
+} from "@shared/schema";
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(process.cwd(), "uploads");
@@ -132,6 +142,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const tenant = await storage.createTenant(tenantData);
 
+      // Mark unit as occupied
+      await storage.updateUnitStatus(unitId, "occupied");
+
       // Create kasunduan record for the tenant
       await storage.createKasunduan({ tenantId: tenant.id, accepted: false });
 
@@ -182,14 +195,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const userId = tenant.userId;
+      const unitId = tenant.unitId;
 
       // Delete tenant (cascade will delete related records)
       await storage.deleteTenant(id);
       
       // Delete the associated user account
       await storage.deleteUser(userId);
+
+      // Mark unit as available
+      await storage.updateUnitStatus(unitId, "available");
       
       res.json({ message: "Tenant deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Unit Management
+  app.get("/api/units", async (req, res) => {
+    try {
+      const unitsList = await storage.getAllUnits();
+      res.json(unitsList);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/units", async (req, res) => {
+    try {
+      const unitData = insertUnitSchema.parse(req.body);
+      const unit = await storage.createUnit(unitData);
+      res.json(unit);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/units/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteUnit(id);
+      res.json({ message: "Unit deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

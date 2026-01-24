@@ -6,6 +6,7 @@ import {
   maintenanceReports,
   kasunduan,
   settings,
+  units,
   type User,
   type InsertUser,
   type Tenant,
@@ -18,6 +19,8 @@ import {
   type InsertKasunduan,
   type Settings,
   type InsertSettings,
+  type Unit,
+  type InsertUnit,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
@@ -61,6 +64,14 @@ export interface IStorage {
   createKasunduan(kasunduanData: InsertKasunduan): Promise<Kasunduan>;
   updateKasunduan(id: number, accepted: boolean): Promise<Kasunduan | undefined>;
   
+  // Unit methods
+  getUnit(id: number): Promise<Unit | undefined>;
+  getUnitByUnitId(unitId: string): Promise<Unit | undefined>;
+  getAllUnits(): Promise<Unit[]>;
+  createUnit(unit: InsertUnit): Promise<Unit>;
+  updateUnitStatus(unitId: string, status: string): Promise<Unit | undefined>;
+  deleteUnit(id: number): Promise<void>;
+
   // Settings methods
   getSetting(key: string): Promise<Settings | undefined>;
   getAllSettings(): Promise<Settings[]>;
@@ -238,6 +249,39 @@ export class DatabaseStorage implements IStorage {
       .where(eq(kasunduan.id, id))
       .returning();
     return kasunduanRecord || undefined;
+  }
+
+  // Unit methods
+  async getUnit(id: number): Promise<Unit | undefined> {
+    const [unit] = await db.select().from(units).where(eq(units.id, id));
+    return unit || undefined;
+  }
+
+  async getUnitByUnitId(unitId: string): Promise<Unit | undefined> {
+    const [unit] = await db.select().from(units).where(eq(units.unitId, unitId));
+    return unit || undefined;
+  }
+
+  async getAllUnits(): Promise<Unit[]> {
+    return await db.select().from(units).orderBy(units.unitId);
+  }
+
+  async createUnit(insertUnit: InsertUnit): Promise<Unit> {
+    const [unit] = await db.insert(units).values(insertUnit).returning();
+    return unit;
+  }
+
+  async updateUnitStatus(unitId: string, status: string): Promise<Unit | undefined> {
+    const [unit] = await db
+      .update(units)
+      .set({ status })
+      .where(eq(units.unitId, unitId))
+      .returning();
+    return unit || undefined;
+  }
+
+  async deleteUnit(id: number): Promise<void> {
+    await db.delete(units).where(eq(units.id, id));
   }
   
   // Settings methods

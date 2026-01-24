@@ -12,6 +12,13 @@ export const users = pgTable("users", {
   role: text("role").notNull(), // 'admin' or 'tenant'
 });
 
+// Units table
+export const units = pgTable("units", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  unitId: text("unit_id").notNull().unique(),
+  status: text("status").notNull().default("available"), // 'available', 'occupied'
+});
+
 // Tenants table - detailed tenant information
 export const tenants = pgTable("tenants", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
@@ -62,6 +69,10 @@ export const settings = pgTable("settings", {
 });
 
 // Relations
+export const unitsRelations = relations(units, ({ many }) => ({
+  tenants: many(tenants),
+}));
+
 export const usersRelations = relations(users, ({ one }) => ({
   tenant: one(tenants, {
     fields: [users.id],
@@ -79,6 +90,10 @@ export const tenantsRelations = relations(tenants, ({ one, many }) => ({
   kasunduan: one(kasunduan, {
     fields: [tenants.id],
     references: [kasunduan.tenantId],
+  }),
+  unit: one(units, {
+    fields: [tenants.unitId],
+    references: [units.unitId],
   }),
 }));
 
@@ -110,6 +125,10 @@ export const insertUserSchema = createInsertSchema(users, {
   role: z.enum(["admin", "tenant"]),
 }).omit({ id: true });
 
+export const insertUnitSchema = createInsertSchema(units, {
+  unitId: z.string().min(1, "Unit ID is required"),
+}).omit({ id: true });
+
 export const insertTenantSchema = createInsertSchema(tenants, {
   fullName: z.string().min(1, "Full name is required"),
   contact: z.string().min(1, "Contact is required"),
@@ -138,6 +157,9 @@ export const insertSettingsSchema = createInsertSchema(settings, {
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export type InsertUnit = z.infer<typeof insertUnitSchema>;
+export type Unit = typeof units.$inferSelect;
 
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 export type Tenant = typeof tenants.$inferSelect;

@@ -71,6 +71,8 @@ export default function AdminPayments() {
       queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payments/overdue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenant/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenant/payments"] });
       toast({ title: "Payment status updated" });
     },
     onError: (error: Error) => {
@@ -88,6 +90,8 @@ export default function AdminPayments() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payments/overdue"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenant/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenant/payments"] });
       // Explicitly refetch payments to ensure UI updates
       queryClient.refetchQueries({ queryKey: ["/api/payments"] });
       toast({ title: "Payment marked as paid successfully" });

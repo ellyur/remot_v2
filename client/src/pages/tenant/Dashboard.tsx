@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, Wrench, Calendar, Home, Plus } from "lucide-react";
+import { DollarSign, Wrench, Calendar, Home, Plus, CheckCircle2, Clock } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,16 @@ export default function TenantDashboard() {
     const [year, monthNum] = month.split("-");
     const date = new Date(parseInt(year), parseInt(monthNum) - 1);
     return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  };
+
+  const currentYear = new Date().getFullYear();
+  const monthsOfYear = Array.from({ length: 12 }, (_, i) => {
+    const month = (i + 1).toString().padStart(2, '0');
+    return `${currentYear}-${month}`;
+  });
+
+  const getPaymentForMonth = (month: string) => {
+    return stats?.recentPayments?.find(p => p.month === month);
   };
 
   if (isLoading) {
@@ -85,7 +95,7 @@ export default function TenantDashboard() {
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Unit
-            </CardTitle>
+              </CardTitle>
             <Home className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -121,6 +131,51 @@ export default function TenantDashboard() {
           description="Submitted reports"
         />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Rent Schedule {currentYear}</CardTitle>
+          <CardDescription>Track your monthly payments for the entire year</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {monthsOfYear.map((month) => {
+              const payment = getPaymentForMonth(month);
+              const isFuture = month > new Date().toISOString().slice(0, 7);
+              
+              return (
+                <div 
+                  key={month}
+                  className={`p-4 rounded-lg border flex flex-col justify-between h-24 ${
+                    payment?.status === 'verified' 
+                      ? 'bg-green-50/50 dark:bg-green-950/10 border-green-200 dark:border-green-900' 
+                      : payment?.status === 'pending'
+                      ? 'bg-yellow-50/50 dark:bg-yellow-950/10 border-yellow-200 dark:border-yellow-900'
+                      : isFuture
+                      ? 'bg-muted/30 border-dashed'
+                      : 'bg-red-50/50 dark:bg-red-950/10 border-red-200 dark:border-red-900'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <span className="font-semibold text-sm">{formatMonth(month).split(' ')[0]}</span>
+                    {payment?.status === 'verified' ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    ) : payment?.status === 'pending' ? (
+                      <Clock className="h-4 w-4 text-yellow-600" />
+                    ) : null}
+                  </div>
+                  <div className="flex justify-between items-end">
+                    <span className="text-xs text-muted-foreground">
+                      {payment ? `₱${payment.amount}` : isFuture ? 'Upcoming' : 'Unpaid'}
+                    </span>
+                    {payment && <StatusBadge status={payment.status} />}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>

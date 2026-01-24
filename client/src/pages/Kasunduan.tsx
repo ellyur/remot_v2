@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest } from "@/lib/queryClient";
 import { FileText } from "lucide-react";
+import { format } from "date-fns";
 
 export default function Kasunduan() {
   const [agreed, setAgreed] = useState(false);
@@ -59,7 +60,7 @@ export default function Kasunduan() {
               <h3 className="text-lg font-semibold">KASUNDUAN NG PAGPAPAUPA</h3>
               
               <p>
-                Ang kasulatang ito ay ginawa at nilagdaan ngayong __________ sa pagitan ng:
+                Ang kasulatang ito ay ginawa at nilagdaan ngayong {format(new Date(), "MMMM dd, yyyy")} sa pagitan ng:
               </p>
 
               <p className="font-semibold">MAY-ARI NG BAHAY / LANDLORD:</p>

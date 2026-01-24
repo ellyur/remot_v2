@@ -382,7 +382,7 @@ export default function TenantProfile() {
                 <h3 className="text-lg font-semibold">KASUNDUAN NG PAGPAPAUPA</h3>
                 
                 <p>
-                  Ang kasulatang ito ay ginawa at nilagdaan ngayong __________ sa pagitan ng:
+                  Ang kasulatang ito ay ginawa at nilagdaan ngayong {kasunduanData?.kasunduan?.dateAccepted ? format(new Date(kasunduanData.kasunduan.dateAccepted), "MMMM dd, yyyy") : "__________"} sa pagitan ng:
                 </p>
 
                 <p className="font-semibold">MAY-ARI NG BAHAY / LANDLORD:</p>

@@ -191,7 +191,7 @@ export default function Tenants() {
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <FormLabel>Unit ID</FormLabel>
+                  <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Unit ID</label>
                   <Input 
                     placeholder="e.g. Unit 101" 
                     value={newUnitId} 

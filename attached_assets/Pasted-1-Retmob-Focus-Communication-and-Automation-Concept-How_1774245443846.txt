@@ -1,0 +1,43 @@
+1.Retmob
+Focus: Communication and Automation
+
+Concept: How does the SMS integration improve the collection rate compared to manual notification methods?
+
+Concept: What specific triggers (e.g., overdue date, partial payment) prompt an automated SMS?
+
+Concept: How does the system handle "SMS congestion" if multiple notifications are sent simultaneously?
+
+Concept: In the absence of a stable mobile network, what is the fallback mechanism for tenant notification?
+
+Technical: What SMS Gateway API did you use, and why was it chosen over others (e.g., Twilio vs. iSMS)?
+
+Technical: How do you ensure the security of tenant contact information stored in your database?
+
+Technical: Is the SMS feature one-way (notifications) or two-way (can tenants reply to acknowledge)?
+
+Technical: How does the system update the "Payment Status" in real-time after an SMS is sent?
+
+Defense: What was the biggest challenge in integrating hardware/API with your web/mobile interface?
+
+Defense: How do you justify the operational cost of SMS credits for small-scale apartment owners?
+Mark
+1. RETMOT
+Integration Logic: How does the system handle SMS delivery failures? If a tenant's number is out of reach, is there a retry mechanism?
+
+Security: Since you handle rental payments, how do you secure the database against unauthorized access to financial records?
+
+Data Integrity: What happens to the "SMS notification" status if the system crashes midway through a broadcast?
+
+Hardware/API: Did you use a GSM Module or a web-based SMS API (like Twilio or iSMS)? What was the basis for this choice?
+
+Automation: Can the landlord schedule automated SMS reminders for late payments, or is it purely manual?
+
+Scalability: If the apartment grows from 10 units to 500, how does the system architecture handle the increased data load?
+
+User Experience: How does the system verify if the phone number provided by the tenant is valid before saving it to the database?
+
+Storage: Are SMS logs stored indefinitely, or is there a "clean-up" script to prevent database bloating?
+
+Compliance: How does your system comply with the Data Privacy Act regarding the collection of tenant contact details?
+
+Architecture: Explain the flow of data from the point a payment is recorded to the point the SMS is received by the tenant.

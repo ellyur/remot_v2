@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { StatsCard } from "@/components/StatsCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/StatusBadge";
 
 interface TenantStats {
@@ -35,7 +36,7 @@ interface BillingPeriod {
   monthLabel: string;
   dueDate: string;
   daysOverdue: number;
-  status: "paid" | "pending" | "rejected" | "unpaid" | "overdue" | "upcoming";
+  status: "paid" | "pending" | "rejected" | "unpaid" | "overdue" | "upcoming" | "n/a";
   payment: {
     id: number;
     amount: string;
@@ -48,6 +49,8 @@ interface BillingPeriod {
 interface BillingPeriodsResponse {
   tenant: { id: number; fullName: string; unitId: string; rentAmount: string };
   periods: BillingPeriod[];
+  year: number;
+  availableYears: number[];
 }
 
 export default function TenantDashboard() {
@@ -60,8 +63,18 @@ export default function TenantDashboard() {
     enabled: !!user,
   });
 
+  const [scheduleYear, setScheduleYear] = useState<number>(new Date().getFullYear());
+
   const { data: billing } = useQuery<BillingPeriodsResponse>({
-    queryKey: [`/api/tenant/billing-periods?userId=${user?.id}`],
+    queryKey: [`/api/tenant/billing-periods`, user?.id, scheduleYear],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/tenant/billing-periods?userId=${user?.id}&year=${scheduleYear}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw new Error("Failed to load billing periods");
+      return res.json();
+    },
     enabled: !!user,
   });
 
@@ -155,22 +168,43 @@ export default function TenantDashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Rent Schedule</CardTitle>
-          <CardDescription>
-            Your monthly billing periods starting from your move-in date
-          </CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <CardTitle>Rent Schedule</CardTitle>
+              <CardDescription>
+                January through December — months before your move-in are left blank
+              </CardDescription>
+            </div>
+            <div className="w-full sm:w-40">
+              <Select
+                value={String(scheduleYear)}
+                onValueChange={(v) => setScheduleYear(parseInt(v, 10))}
+              >
+                <SelectTrigger data-testid="select-schedule-year">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(billing?.availableYears ?? [scheduleYear]).map((y) => (
+                    <SelectItem key={y} value={String(y)} data-testid={`option-year-${y}`}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {!billing || billing.periods.length === 0 ? (
+          {!tenant?.moveInDate ? (
             <div className="text-center py-8 text-muted-foreground" data-testid="text-no-billing-periods">
-              {tenant?.moveInDate
-                ? "No billing periods yet."
-                : "Your move-in date hasn't been set. Please contact your landlord."}
+              Your move-in date hasn't been set. Please contact your landlord.
             </div>
           ) : (
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-w-0">
-              {billing.periods.map((period) => {
+              {(billing?.periods ?? []).map((period) => {
                 const { status, payment } = period;
+                const isNA = status === "n/a";
+
                 const containerClass =
                   status === "paid"
                     ? "bg-green-50/50 dark:bg-green-950/10 border-green-200 dark:border-green-900"
@@ -180,6 +214,8 @@ export default function TenantDashboard() {
                     ? "bg-red-50/50 dark:bg-red-950/10 border-red-200 dark:border-red-900"
                     : status === "upcoming"
                     ? "bg-muted/20 border-dashed opacity-70"
+                    : isNA
+                    ? "bg-transparent border-dashed border-muted-foreground/20 opacity-50"
                     : "bg-muted/30 border-dashed";
 
                 const statusLabel =
@@ -193,6 +229,8 @@ export default function TenantDashboard() {
                     ? `Overdue${period.daysOverdue ? ` (${period.daysOverdue}d)` : ""}`
                     : status === "upcoming"
                     ? "Upcoming"
+                    : isNA
+                    ? ""
                     : "Unpaid";
 
                 return (
@@ -213,28 +251,30 @@ export default function TenantDashboard() {
                         <XCircle className="h-4 w-4 text-red-600" />
                       ) : null}
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between items-end gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          ₱{payment?.amount ?? period.rentAmount}
-                        </span>
-                        <span className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground">
-                          {statusLabel}
-                        </span>
+                    {!isNA && (
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between items-end gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            ₱{payment?.amount ?? period.rentAmount}
+                          </span>
+                          <span className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground">
+                            {statusLabel}
+                          </span>
+                        </div>
+                        {status === "rejected" && payment?.rejectionNotes && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-xs px-2 text-red-600 hover:text-red-700 hover:bg-red-50 w-full justify-start"
+                            onClick={() => setRejectionNote(payment.rejectionNotes!)}
+                            data-testid={`button-view-rejection-${payment.id}`}
+                          >
+                            <MessageSquare className="h-3 w-3 mr-1" />
+                            View reason
+                          </Button>
+                        )}
                       </div>
-                      {status === "rejected" && payment?.rejectionNotes && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-xs px-2 text-red-600 hover:text-red-700 hover:bg-red-50 w-full justify-start"
-                          onClick={() => setRejectionNote(payment.rejectionNotes!)}
-                          data-testid={`button-view-rejection-${payment.id}`}
-                        >
-                          <MessageSquare className="h-3 w-3 mr-1" />
-                          View reason
-                        </Button>
-                      )}
-                    </div>
+                    )}
                   </div>
                 );
               })}

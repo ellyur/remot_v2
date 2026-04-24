@@ -32,7 +32,7 @@ interface BillingPeriod {
   monthLabel: string;
   dueDate: string;
   daysOverdue: number;
-  status: "paid" | "pending" | "rejected" | "unpaid" | "overdue" | "upcoming";
+  status: "paid" | "pending" | "rejected" | "unpaid" | "overdue" | "upcoming" | "n/a";
   payment: { id: number; amount: string; status: string } | null;
   rentAmount: string;
 }

@@ -1092,7 +1092,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     monthLabel: string; // "March 2026"
     dueDate: string; // ISO
     daysOverdue: number;
-    status: "paid" | "pending" | "rejected" | "unpaid" | "overdue" | "upcoming";
+    status: "paid" | "pending" | "rejected" | "unpaid" | "overdue" | "upcoming" | "n/a";
     payment: any | null;
     rentAmount: string;
   };
@@ -1116,29 +1116,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     payments: Array<{ month: string; status: string; [k: string]: any }>,
     dueDay: number,
     today: Date,
+    targetYear?: number,
   ): Promise<BillingPeriod[]> {
     if (!tenant.moveInDate) return [];
 
     const startDate = new Date(tenant.moveInDate + "T00:00:00");
     if (Number.isNaN(startDate.getTime())) return [];
 
-    let year = startDate.getFullYear();
-    let monthIdx = startDate.getMonth();
+    // Compute the tenant's first billable month (year + monthIdx).
+    let firstBillYear = startDate.getFullYear();
+    let firstBillMonthIdx = startDate.getMonth();
 
     // If tenant moved in AFTER this month's due day, their first bill is next month.
     // (e.g. due day = 5, move-in April 24 → skip April, start billing in May.)
     if (startDate.getDate() > dueDay) {
-      monthIdx++;
-      if (monthIdx > 11) {
-        monthIdx = 0;
-        year++;
+      firstBillMonthIdx++;
+      if (firstBillMonthIdx > 11) {
+        firstBillMonthIdx = 0;
+        firstBillYear++;
       }
     }
 
-    // Show schedule from move-in through the end of next calendar year so
-    // tenants can see upcoming months too (not just billed ones).
-    const endYear = today.getFullYear() + 1;
-    const endMonthIdx = 11;
+    const year = targetYear ?? today.getFullYear();
 
     const paymentByMonth = new Map<string, any>();
     for (const p of payments) {
@@ -1155,13 +1154,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const todayMonthIdx = today.getMonth();
 
     const periods: BillingPeriod[] = [];
-    while (
-      year < endYear ||
-      (year === endYear && monthIdx <= endMonthIdx)
-    ) {
+    for (let monthIdx = 0; monthIdx < 12; monthIdx++) {
       const month = `${year}-${String(monthIdx + 1).padStart(2, "0")}`;
       const dueDate = new Date(year, monthIdx, dueDay);
       const payment = paymentByMonth.get(month) || null;
+
+      // Months that fall before the tenant's first billing month are not applicable.
+      const isBeforeFirstBill =
+        year < firstBillYear ||
+        (year === firstBillYear && monthIdx < firstBillMonthIdx);
 
       // A billing month is "current or past" once we've reached its calendar month.
       const isCurrentOrPastMonth =
@@ -1172,6 +1173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (payment?.status === "verified") status = "paid";
       else if (payment?.status === "pending") status = "pending";
       else if (payment?.status === "rejected") status = "rejected";
+      else if (isBeforeFirstBill) status = "n/a";
       else if (!isCurrentOrPastMonth) status = "upcoming";
       else status = today > dueDate ? "overdue" : "unpaid";
 
@@ -1191,15 +1193,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         payment,
         rentAmount: tenant.rentAmount,
       });
-
-      monthIdx++;
-      if (monthIdx > 11) {
-        monthIdx = 0;
-        year++;
-      }
     }
 
     return periods;
+  }
+
+  function parseYearParam(raw: unknown, fallback: number): number {
+    const n = typeof raw === "string" ? parseInt(raw, 10) : Number(raw);
+    if (!Number.isFinite(n) || n < 2000 || n > 2100) return fallback;
+    return n;
+  }
+
+  // Compute the available year range for a tenant: from move-in year to current year + 1.
+  function tenantYearRange(
+    moveInDate: string | null,
+    today: Date,
+  ): { years: number[]; firstBillYear: number | null } {
+    const currentYear = today.getFullYear();
+    if (!moveInDate) {
+      return { years: [currentYear, currentYear + 1], firstBillYear: null };
+    }
+    const startDate = new Date(moveInDate + "T00:00:00");
+    if (Number.isNaN(startDate.getTime())) {
+      return { years: [currentYear, currentYear + 1], firstBillYear: null };
+    }
+    const startYear = startDate.getFullYear();
+    const endYear = Math.max(currentYear + 1, startYear + 1);
+    const years: number[] = [];
+    for (let y = startYear; y <= endYear; y++) years.push(y);
+    return { years, firstBillYear: startYear };
   }
 
   // Billing periods for one tenant (admin or tenant)
@@ -1213,13 +1235,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dueDay = clampDueDay(dueDaySetting?.value);
       const payments = await storage.getPaymentsByTenantId(id);
 
+      const today = new Date();
+      const year = parseYearParam(req.query.year, today.getFullYear());
       const periods = await buildBillingPeriodsForTenant(
         tenant as any,
         payments as any,
         dueDay,
-        new Date(),
+        today,
+        year,
       );
-      res.json({ tenant, periods });
+      const { years } = tenantYearRange((tenant as any).moveInDate ?? null, today);
+      res.json({ tenant, periods, year, availableYears: years });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1236,13 +1262,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dueDay = clampDueDay(dueDaySetting?.value);
       const payments = await storage.getPaymentsByTenantId(tenant.id);
 
+      const today = new Date();
+      const year = parseYearParam(req.query.year, today.getFullYear());
       const periods = await buildBillingPeriodsForTenant(
         tenant as any,
         payments as any,
         dueDay,
-        new Date(),
+        today,
+        year,
       );
-      res.json({ tenant, periods });
+      const { years } = tenantYearRange((tenant as any).moveInDate ?? null, today);
+      res.json({ tenant, periods, year, availableYears: years });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

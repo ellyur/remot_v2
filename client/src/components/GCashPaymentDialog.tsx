@@ -121,7 +121,7 @@ export function GCashPaymentDialog({ open, onOpenChange }: GCashPaymentDialogPro
           </DialogTitle>
           <DialogDescription className="text-xs">
             {step === "info" 
-              ? "Send payment to the landlord's GCash account"
+              ? "Send payment via GCash or scan the QR code below"
               : "Upload your payment proof"
             }
           </DialogDescription>

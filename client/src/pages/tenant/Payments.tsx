@@ -68,9 +68,14 @@ export default function TenantPayments() {
     enabled: !!user,
   });
 
-  // Months the tenant can still pay for: unpaid, overdue, or previously rejected
+  // Months the tenant can still pay for: unpaid, overdue, previously rejected,
+  // or upcoming (allow pre-paying future months).
   const payableMonths = (billing?.periods ?? []).filter(
-    (p) => p.status === "unpaid" || p.status === "overdue" || p.status === "rejected",
+    (p) =>
+      p.status === "unpaid" ||
+      p.status === "overdue" ||
+      p.status === "rejected" ||
+      p.status === "upcoming",
   );
 
   // Default to the oldest unpaid period (overdue first), so they settle arrears first

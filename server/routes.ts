@@ -1077,6 +1077,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     let year = startDate.getFullYear();
     let monthIdx = startDate.getMonth();
+
+    // If tenant moved in AFTER this month's due day, their first bill is next month.
+    // (e.g. due day = 5, move-in April 24 → skip April, start billing in May.)
+    if (startDate.getDate() > dueDay) {
+      monthIdx++;
+      if (monthIdx > 11) {
+        monthIdx = 0;
+        year++;
+      }
+    }
+
     const endYear = today.getFullYear();
     const endMonthIdx = today.getMonth();
 

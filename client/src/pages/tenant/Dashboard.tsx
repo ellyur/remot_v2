@@ -61,15 +61,15 @@ export default function TenantDashboard() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="p-4 md:p-6 space-y-6 overflow-x-hidden">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
+        <div className="min-w-0">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Welcome, {tenant?.fullName}</h1>
           <p className="text-muted-foreground mt-1">
             Your tenant dashboard
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:justify-end min-w-0">
           <Button 
             className="gap-2"
             onClick={() => setLocation("/tenant/payments")}
@@ -90,7 +90,7 @@ export default function TenantDashboard() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 min-w-0">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -138,7 +138,7 @@ export default function TenantDashboard() {
           <CardDescription>Track your monthly payments for the entire year</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-w-0">
             {monthsOfYear.map((month) => {
               const payment = getPaymentForMonth(month);
               const isFuture = month > new Date().toISOString().slice(0, 7);
@@ -177,7 +177,7 @@ export default function TenantDashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 min-w-0">
         <Card>
           <CardHeader>
             <CardTitle>Recent Payments</CardTitle>

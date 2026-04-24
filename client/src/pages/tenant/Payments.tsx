@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
@@ -19,12 +20,27 @@ import { GCashPaymentDialog } from "@/components/GCashPaymentDialog";
 import type { Payment } from "@shared/schema";
 
 const paymentSchema = z.object({
-  month: z.string().regex(/^\d{4}-\d{2}$/, "Month must be in YYYY-MM format"),
+  month: z.string().regex(/^\d{4}-\d{2}$/, "Please choose a month to pay"),
   amount: z.string().min(1, "Amount is required"),
   image: z.instanceof(FileList).optional(),
 });
 
 type PaymentFormData = z.infer<typeof paymentSchema>;
+
+interface BillingPeriod {
+  month: string;
+  monthLabel: string;
+  dueDate: string;
+  daysOverdue: number;
+  status: "paid" | "pending" | "rejected" | "unpaid" | "overdue";
+  payment: { id: number; amount: string; status: string } | null;
+  rentAmount: string;
+}
+
+interface BillingPeriodsResponse {
+  tenant: { id: number; fullName: string; rentAmount: string };
+  periods: BillingPeriod[];
+}
 
 export default function TenantPayments() {
   const [isOpen, setIsOpen] = useState(false);
@@ -47,13 +63,34 @@ export default function TenantPayments() {
     enabled: !!user,
   });
 
+  const { data: billing } = useQuery<BillingPeriodsResponse>({
+    queryKey: [`/api/tenant/billing-periods?userId=${user?.id}`],
+    enabled: !!user,
+  });
+
+  // Months the tenant can still pay for: unpaid, overdue, or previously rejected
+  const payableMonths = (billing?.periods ?? []).filter(
+    (p) => p.status === "unpaid" || p.status === "overdue" || p.status === "rejected",
+  );
+
+  // Default to the oldest unpaid period (overdue first), so they settle arrears first
+  const defaultMonth = payableMonths[0]?.month ?? "";
+
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
-      month: new Date().toISOString().slice(0, 7),
+      month: defaultMonth,
       amount: tenant?.rentAmount || "",
     },
   });
+
+  // Re-seed default month once billing data arrives or after a successful submission
+  useEffect(() => {
+    if (!isOpen) return;
+    if (defaultMonth && !form.getValues("month")) {
+      form.setValue("month", defaultMonth);
+    }
+  }, [isOpen, defaultMonth, form]);
 
   const uploadMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -187,19 +224,60 @@ export default function TenantPayments() {
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="month"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Payment Month</FormLabel>
-                      <FormControl>
-                        <Input type="month" data-testid="input-month" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {payableMonths.length === 0 ? (
+                  <div className="rounded-lg border border-green-200 bg-green-50/60 dark:bg-green-950/10 dark:border-green-900 p-4 text-sm text-green-800 dark:text-green-300" data-testid="text-all-paid">
+                    You're all caught up! Every month so far has either been paid
+                    or is awaiting verification.
+                  </div>
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="month"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Payment Month</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-month">
+                              <SelectValue placeholder="Choose a month to pay" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {payableMonths.map((p) => (
+                              <SelectItem
+                                key={p.month}
+                                value={p.month}
+                                data-testid={`option-month-${p.month}`}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span>{p.monthLabel}</span>
+                                  {p.status === "overdue" && (
+                                    <span className="text-xs font-medium text-red-600">
+                                      Overdue · {p.daysOverdue}d late
+                                    </span>
+                                  )}
+                                  {p.status === "rejected" && (
+                                    <span className="text-xs font-medium text-red-600">
+                                      Resubmit
+                                    </span>
+                                  )}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Overdue months are listed first so you can settle them
+                          before the current month.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <FormField
                   control={form.control}
@@ -253,7 +331,7 @@ export default function TenantPayments() {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={uploadMutation.isPending}
+                    disabled={uploadMutation.isPending || payableMonths.length === 0}
                     data-testid="button-submit-payment"
                   >
                     {uploadMutation.isPending ? "Uploading..." : "Submit Payment"}

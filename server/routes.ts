@@ -329,6 +329,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "pending",
       });
 
+      // Prevent duplicate submissions for a month that's already paid or pending
+      const existingForMonth = await storage.getPaymentsByTenantId(paymentData.tenantId);
+      const blocking = existingForMonth.find(
+        (p) => p.month === paymentData.month && (p.status === "verified" || p.status === "pending"),
+      );
+      if (blocking) {
+        return res.status(409).json({
+          message:
+            blocking.status === "verified"
+              ? "You have already paid for this month."
+              : "A payment for this month is already awaiting verification.",
+        });
+      }
+
       const payment = await storage.createPayment(paymentData);
 
       // Send SMS notification to tenant confirming submission
@@ -366,6 +380,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         imagePath: null, // No image for admin-created payments
         status: "verified", // Directly verified when created by admin
       });
+
+      // Prevent duplicate verified payments for the same month
+      const existing = await storage.getPaymentsByTenantId(paymentData.tenantId);
+      if (existing.some((p) => p.month === paymentData.month && p.status === "verified")) {
+        return res.status(409).json({ message: "This month is already marked as paid for this tenant." });
+      }
 
       const payment = await storage.createPayment(paymentData);
 

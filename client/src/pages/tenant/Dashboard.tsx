@@ -30,6 +30,26 @@ interface TenantStats {
   }>;
 }
 
+interface BillingPeriod {
+  month: string;
+  monthLabel: string;
+  dueDate: string;
+  daysOverdue: number;
+  status: "paid" | "pending" | "rejected" | "unpaid" | "overdue";
+  payment: {
+    id: number;
+    amount: string;
+    status: string;
+    rejectionNotes?: string | null;
+  } | null;
+  rentAmount: string;
+}
+
+interface BillingPeriodsResponse {
+  tenant: { id: number; fullName: string; unitId: string; rentAmount: string };
+  periods: BillingPeriod[];
+}
+
 export default function TenantDashboard() {
   const [, setLocation] = useLocation();
   const { user, tenant } = useAuth();
@@ -40,6 +60,11 @@ export default function TenantDashboard() {
     enabled: !!user,
   });
 
+  const { data: billing } = useQuery<BillingPeriodsResponse>({
+    queryKey: [`/api/tenant/billing-periods?userId=${user?.id}`],
+    enabled: !!user,
+  });
+
   const formatMonth = (month: string) => {
     const [year, monthNum] = month.split("-");
     const date = new Date(parseInt(year), parseInt(monthNum) - 1);
@@ -47,14 +72,6 @@ export default function TenantDashboard() {
   };
 
   const currentYear = new Date().getFullYear();
-  const monthsOfYear = Array.from({ length: 12 }, (_, i) => {
-    const month = (i + 1).toString().padStart(2, '0');
-    return `${currentYear}-${month}`;
-  });
-
-  const getPaymentForMonth = (month: string) => {
-    return stats?.recentPayments?.find(p => p.month === month);
-  };
 
   if (isLoading) {
     return (
@@ -138,64 +155,87 @@ export default function TenantDashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Rent Schedule {currentYear}</CardTitle>
-          <CardDescription>Track your monthly payments for the entire year</CardDescription>
+          <CardTitle>Rent Schedule</CardTitle>
+          <CardDescription>
+            Your monthly billing periods starting from your move-in date
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-w-0">
-            {monthsOfYear.map((month) => {
-              const payment = getPaymentForMonth(month);
-              const isFuture = month > new Date().toISOString().slice(0, 7);
-              
-              return (
-                <div 
-                  key={month}
-                  className={`p-4 rounded-lg border flex flex-col justify-between min-h-[6rem] ${
-                    payment?.status === 'verified' 
-                      ? 'bg-green-50/50 dark:bg-green-950/10 border-green-200 dark:border-green-900' 
-                      : payment?.status === 'pending'
-                      ? 'bg-yellow-50/50 dark:bg-yellow-950/10 border-yellow-200 dark:border-yellow-900'
-                      : payment?.status === 'rejected'
-                      ? 'bg-red-50/50 dark:bg-red-950/10 border-red-200 dark:border-red-900'
-                      : isFuture
-                      ? 'bg-muted/30 border-dashed'
-                      : 'bg-red-50/50 dark:bg-red-950/10 border-red-200 dark:border-red-900'
-                  }`}
-                >
-                  <div className="flex justify-between items-start">
-                    <span className="font-semibold text-sm">{formatMonth(month).split(' ')[0]}</span>
-                    {payment?.status === 'verified' ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    ) : payment?.status === 'pending' ? (
-                      <Clock className="h-4 w-4 text-yellow-600" />
-                    ) : payment?.status === 'rejected' ? (
-                      <XCircle className="h-4 w-4 text-red-600" />
-                    ) : null}
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <div className="flex justify-between items-end">
-                      <span className="text-xs text-muted-foreground">
-                        {payment ? `₱${payment.amount}` : isFuture ? 'Upcoming' : 'Unpaid'}
+          {!billing || billing.periods.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground" data-testid="text-no-billing-periods">
+              {tenant?.moveInDate
+                ? "No billing periods yet."
+                : "Your move-in date hasn't been set. Please contact your landlord."}
+            </div>
+          ) : (
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-w-0">
+              {billing.periods.map((period) => {
+                const { status, payment } = period;
+                const containerClass =
+                  status === "paid"
+                    ? "bg-green-50/50 dark:bg-green-950/10 border-green-200 dark:border-green-900"
+                    : status === "pending"
+                    ? "bg-yellow-50/50 dark:bg-yellow-950/10 border-yellow-200 dark:border-yellow-900"
+                    : status === "rejected" || status === "overdue"
+                    ? "bg-red-50/50 dark:bg-red-950/10 border-red-200 dark:border-red-900"
+                    : "bg-muted/30 border-dashed";
+
+                const statusLabel =
+                  status === "paid"
+                    ? "Paid"
+                    : status === "pending"
+                    ? "Pending"
+                    : status === "rejected"
+                    ? "Rejected"
+                    : status === "overdue"
+                    ? `Overdue${period.daysOverdue ? ` (${period.daysOverdue}d)` : ""}`
+                    : "Unpaid";
+
+                return (
+                  <div
+                    key={period.month}
+                    className={`p-4 rounded-lg border flex flex-col justify-between min-h-[6rem] ${containerClass}`}
+                    data-testid={`card-billing-${period.month}`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <span className="font-semibold text-sm">
+                        {formatMonth(period.month).split(" ")[0]}
                       </span>
-                      {payment && <StatusBadge status={payment.status} />}
+                      {status === "paid" ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      ) : status === "pending" ? (
+                        <Clock className="h-4 w-4 text-yellow-600" />
+                      ) : status === "rejected" || status === "overdue" ? (
+                        <XCircle className="h-4 w-4 text-red-600" />
+                      ) : null}
                     </div>
-                    {payment?.status === 'rejected' && payment.rejectionNotes && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-xs px-2 text-red-600 hover:text-red-700 hover:bg-red-50 w-full justify-start"
-                        onClick={() => setRejectionNote(payment.rejectionNotes!)}
-                        data-testid={`button-view-rejection-${payment.id}`}
-                      >
-                        <MessageSquare className="h-3 w-3 mr-1" />
-                        View reason
-                      </Button>
-                    )}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-end gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          ₱{payment?.amount ?? period.rentAmount}
+                        </span>
+                        <span className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground">
+                          {statusLabel}
+                        </span>
+                      </div>
+                      {status === "rejected" && payment?.rejectionNotes && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs px-2 text-red-600 hover:text-red-700 hover:bg-red-50 w-full justify-start"
+                          onClick={() => setRejectionNote(payment.rejectionNotes!)}
+                          data-testid={`button-view-rejection-${payment.id}`}
+                        >
+                          <MessageSquare className="h-3 w-3 mr-1" />
+                          View reason
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 

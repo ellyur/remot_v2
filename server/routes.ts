@@ -385,13 +385,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/payments/:id/status", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { status } = req.body;
+      const { status, rejectionNotes } = req.body;
 
-      if (!["pending", "verified"].includes(status)) {
+      if (!["pending", "verified", "rejected"].includes(status)) {
         return res.status(400).json({ message: "Invalid status" });
       }
 
-      const payment = await storage.updatePaymentStatus(id, status);
+      if (status === "rejected" && !rejectionNotes?.trim()) {
+        return res.status(400).json({ message: "Rejection notes are required when rejecting a payment" });
+      }
+
+      const payment = await storage.updatePaymentStatus(id, status, rejectionNotes);
 
       if (!payment) {
         return res.status(404).json({ message: "Payment not found" });

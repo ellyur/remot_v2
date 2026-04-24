@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/PasswordInput";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
@@ -27,11 +28,19 @@ const tenantSchema = z.object({
   ),
   password: z.string(),
   fullName: z.string().min(1, "Full name is required"),
-  contact: z.string().min(1, "Contact is required"),
+  contact: z
+    .string()
+    .regex(/^09\d{9}$/, "Must be 11 digits starting with 09 (e.g. 09171234567)"),
   unitId: z.string().min(1, "Unit ID is required"),
   occupation: z.string().optional(),
   rentAmount: z.string().min(1, "Rent amount is required"),
-  emergencyContact: z.string().optional(),
+  emergencyContact: z
+    .string()
+    .optional()
+    .refine(
+      (s) => !s || /^09\d{9}$/.test(s),
+      "Must be 11 digits starting with 09 (e.g. 09171234567)",
+    ),
   moveInDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Move-in date is required"),
 }).refine((data) => {
   if (data.password.length > 0 && data.password.length < 6) {
@@ -282,8 +291,7 @@ export default function Tenants() {
                         <FormItem>
                           <FormLabel>Password</FormLabel>
                           <FormControl>
-                            <Input
-                              type="password"
+                            <PasswordInput
                               placeholder={editingTenant ? "Leave empty to keep current" : "Password"}
                               data-testid="input-password"
                               {...field}
@@ -317,7 +325,16 @@ export default function Tenants() {
                         <FormItem>
                           <FormLabel>Contact Number</FormLabel>
                           <FormControl>
-                            <Input placeholder="09xxxxxxxxx" data-testid="input-contact" {...field} />
+                            <Input
+                              placeholder="09171234567"
+                              inputMode="numeric"
+                              maxLength={11}
+                              data-testid="input-contact"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(e.target.value.replace(/\D/g, "").slice(0, 11))
+                              }
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -390,7 +407,16 @@ export default function Tenants() {
                         <FormItem>
                           <FormLabel>Emergency Contact (Optional)</FormLabel>
                           <FormControl>
-                            <Input placeholder="Emergency contact number" data-testid="input-emergency-contact" {...field} />
+                            <Input
+                              placeholder="09171234567"
+                              inputMode="numeric"
+                              maxLength={11}
+                              data-testid="input-emergency-contact"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(e.target.value.replace(/\D/g, "").slice(0, 11))
+                              }
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

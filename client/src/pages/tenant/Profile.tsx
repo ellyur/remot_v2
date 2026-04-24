@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/PasswordInput";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,9 +20,17 @@ import { format } from "date-fns";
 
 const editTenantSchema = z.object({
   fullName: z.string().min(1, "Full name is required"),
-  contact: z.string().min(1, "Contact is required"),
+  contact: z
+    .string()
+    .regex(/^09\d{9}$/, "Must be 11 digits starting with 09 (e.g. 09171234567)"),
   occupation: z.string().optional(),
-  emergencyContact: z.string().optional(),
+  emergencyContact: z
+    .string()
+    .optional()
+    .refine(
+      (s) => !s || /^09\d{9}$/.test(s),
+      "Must be 11 digits starting with 09 (e.g. 09171234567)",
+    ),
   password: z.string().optional(),
 }).refine((data) => {
   if (data.password && data.password.length > 0 && data.password.length < 6) {
@@ -270,7 +279,16 @@ export default function TenantProfile() {
                   <FormItem>
                     <FormLabel>Contact Number</FormLabel>
                     <FormControl>
-                      <Input {...field} data-testid="input-contact" />
+                      <Input
+                        placeholder="09171234567"
+                        inputMode="numeric"
+                        maxLength={11}
+                        data-testid="input-contact"
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(e.target.value.replace(/\D/g, "").slice(0, 11))
+                        }
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -298,7 +316,16 @@ export default function TenantProfile() {
                   <FormItem>
                     <FormLabel>Emergency Contact (Optional)</FormLabel>
                     <FormControl>
-                      <Input {...field} data-testid="input-emergency-contact" />
+                      <Input
+                        placeholder="09171234567"
+                        inputMode="numeric"
+                        maxLength={11}
+                        data-testid="input-emergency-contact"
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(e.target.value.replace(/\D/g, "").slice(0, 11))
+                        }
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -312,8 +339,7 @@ export default function TenantProfile() {
                   <FormItem>
                     <FormLabel>New Password (Optional)</FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
+                      <PasswordInput
                         placeholder="Leave blank to keep current password"
                         {...field}
                         data-testid="input-password"

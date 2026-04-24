@@ -119,7 +119,7 @@ export function GCashPaymentDialog({ open, onOpenChange }: GCashPaymentDialogPro
             <Smartphone className="h-5 w-5 text-blue-500" />
             Pay with GCash
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs">
             {step === "info" 
               ? "Send payment to the landlord's GCash account"
               : "Upload your payment proof"

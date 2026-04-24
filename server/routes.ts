@@ -1042,7 +1042,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dueDay = isNaN(parsedDueDay) || parsedDueDay < 1 || parsedDueDay > 28 ? 5 : parsedDueDay;
       
       const today = new Date();
-      const currentMonth = today.toISOString().slice(0, 7);
+      const currentYear = today.getFullYear();
+      const currentMonthIndex = today.getMonth();
+      const currentMonth = `${currentYear}-${String(currentMonthIndex + 1).padStart(2, "0")}`;
+      const todayLocal = new Date(currentYear, currentMonthIndex, today.getDate());
       
       // Get all tenants who haven't paid for current month
       const paidTenantIds = new Set(
@@ -1056,9 +1059,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const tenant of tenantsList) {
         if (!paidTenantIds.has(tenant.id)) {
           // Check if payment is overdue (past due day of current month)
-          const dueDate = new Date(today.getFullYear(), today.getMonth(), dueDay);
-          const isOverdue = today > dueDate;
-          const daysOverdue = isOverdue ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+          const dueDate = new Date(currentYear, currentMonthIndex, dueDay);
+          const isOverdue = todayLocal > dueDate;
+          const daysOverdue = isOverdue ? Math.floor((todayLocal.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
           
           if (isOverdue) {
             overdueList.push({

@@ -165,15 +165,15 @@ export default function TenantProfile() {
 
   return (
     <>
-      <div className="p-4 md:p-6 space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <div>
+      <div className="p-4 md:p-6 space-y-6 overflow-x-hidden">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
+          <div className="min-w-0">
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Profile</h1>
             <p className="text-muted-foreground mt-1">
               Your personal information
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:justify-end min-w-0">
             <Button
               variant="outline"
               size="sm"
@@ -228,17 +228,17 @@ export default function TenantProfile() {
             <CardDescription>Your registered tenant details</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 min-w-0">
               {profileItems.map((item) => (
                 <div
                   key={item.label}
-                  className="flex items-center gap-3 p-4 rounded-lg border"
+                  className="flex items-center gap-3 p-4 rounded-lg border min-w-0"
                   data-testid={`profile-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                 >
                   <item.icon className="h-5 w-5 text-muted-foreground" />
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="text-sm text-muted-foreground">{item.label}</div>
-                    <div className="font-medium">{item.value}</div>
+                    <div className="font-medium break-words">{item.value}</div>
                   </div>
                 </div>
               ))}

@@ -128,7 +128,7 @@ export function GCashPaymentDialog({ open, onOpenChange }: GCashPaymentDialogPro
         </DialogHeader>
 
         {step === "info" ? (
-          <div className="space-y-4 sm:grid sm:grid-cols-[1.15fr_0.85fr] sm:gap-6 sm:space-y-0">
+          <div className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-6 sm:space-y-0">
             <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
               <CardContent className="pt-6">
                 <div className="text-center space-y-4">
@@ -183,6 +183,16 @@ export function GCashPaymentDialog({ open, onOpenChange }: GCashPaymentDialogPro
             </Card>
 
             <div className="space-y-4">
+              <div className="pt-4 border-t sm:border-t-0 sm:pt-0">
+                <p className="text-sm text-muted-foreground mb-1">Amount to Pay</p>
+                <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                  ₱{tenant?.rentAmount || "0.00"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  For {formatMonth(new Date().toISOString().slice(0, 7))}
+                </p>
+              </div>
+
               {settings?.payment_instructions && (
                 <div className="p-4 bg-muted rounded-lg">
                   <p className="text-sm font-medium mb-1">Instructions:</p>

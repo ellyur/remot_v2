@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, decimal, date } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -29,6 +29,7 @@ export const tenants = pgTable("tenants", {
   occupation: text("occupation"),
   rentAmount: decimal("rent_amount", { precision: 10, scale: 2 }).notNull(),
   emergencyContact: text("emergency_contact"),
+  moveInDate: date("move_in_date"),
 });
 
 // Payments table - track payment proofs

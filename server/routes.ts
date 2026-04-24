@@ -132,7 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tenants", async (req, res) => {
     try {
-      const { username, password, fullName, contact, unitId, occupation, rentAmount, emergencyContact } = req.body;
+      const { username, password, fullName, contact, unitId, occupation, rentAmount, emergencyContact, moveInDate } = req.body;
 
       // Validate user data
       const userData = insertUserSchema.parse({ username, password, role: "tenant" });
@@ -143,6 +143,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create user account
       const user = await storage.createUser({ ...userData, password: hashedPassword });
 
+      // Default move-in date to today if not provided
+      const today = new Date().toISOString().slice(0, 10);
+      const finalMoveInDate = (moveInDate && /^\d{4}-\d{2}-\d{2}$/.test(moveInDate))
+        ? moveInDate
+        : today;
+
       // Create tenant profile
       const tenantData = insertTenantSchema.parse({
         userId: user.id,
@@ -152,6 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         occupation: occupation || null,
         rentAmount,
         emergencyContact: emergencyContact || null,
+        moveInDate: finalMoveInDate,
       });
 
       const tenant = await storage.createTenant(tenantData);
@@ -171,7 +178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/tenants/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { fullName, contact, unitId, occupation, rentAmount, emergencyContact, password } = req.body;
+      const { fullName, contact, unitId, occupation, rentAmount, emergencyContact, password, moveInDate } = req.body;
 
       const updateData: any = {};
       if (fullName) updateData.fullName = fullName;
@@ -180,6 +187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (occupation !== undefined) updateData.occupation = occupation || null;
       if (rentAmount) updateData.rentAmount = rentAmount;
       if (emergencyContact !== undefined) updateData.emergencyContact = emergencyContact || null;
+      if (moveInDate && /^\d{4}-\d{2}-\d{2}$/.test(moveInDate)) updateData.moveInDate = moveInDate;
 
       const tenant = await storage.updateTenant(id, updateData);
 
@@ -1031,43 +1039,280 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Overdue payments endpoint
+  // ---------- Billing period helpers ----------
+  type BillingPeriod = {
+    month: string; // YYYY-MM
+    monthLabel: string; // "March 2026"
+    dueDate: string; // ISO
+    daysOverdue: number;
+    status: "paid" | "pending" | "rejected" | "unpaid" | "overdue";
+    payment: any | null;
+    rentAmount: string;
+  };
+
+  function formatMonthLabel(month: string): string {
+    const [y, m] = month.split("-").map((n) => parseInt(n, 10));
+    return new Date(y, m - 1, 1).toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric",
+    });
+  }
+
+  function clampDueDay(value: unknown, fallback = 5): number {
+    const n = typeof value === "string" ? parseInt(value, 10) : Number(value);
+    if (!Number.isFinite(n) || n < 1 || n > 28) return fallback;
+    return n;
+  }
+
+  async function buildBillingPeriodsForTenant(
+    tenant: { id: number; rentAmount: string; moveInDate: string | null },
+    payments: Array<{ month: string; status: string; [k: string]: any }>,
+    dueDay: number,
+    today: Date,
+  ): Promise<BillingPeriod[]> {
+    if (!tenant.moveInDate) return [];
+
+    const startDate = new Date(tenant.moveInDate + "T00:00:00");
+    if (Number.isNaN(startDate.getTime())) return [];
+
+    let year = startDate.getFullYear();
+    let monthIdx = startDate.getMonth();
+    const endYear = today.getFullYear();
+    const endMonthIdx = today.getMonth();
+
+    const paymentByMonth = new Map<string, any>();
+    for (const p of payments) {
+      const existing = paymentByMonth.get(p.month);
+      // Prefer verified > pending > rejected
+      const rank = (s: string) =>
+        s === "verified" ? 3 : s === "pending" ? 2 : s === "rejected" ? 1 : 0;
+      if (!existing || rank(p.status) > rank(existing.status)) {
+        paymentByMonth.set(p.month, p);
+      }
+    }
+
+    const periods: BillingPeriod[] = [];
+    while (
+      year < endYear ||
+      (year === endYear && monthIdx <= endMonthIdx)
+    ) {
+      const month = `${year}-${String(monthIdx + 1).padStart(2, "0")}`;
+      const dueDate = new Date(year, monthIdx, dueDay);
+      const payment = paymentByMonth.get(month) || null;
+
+      let status: BillingPeriod["status"];
+      if (payment?.status === "verified") status = "paid";
+      else if (payment?.status === "pending") status = "pending";
+      else if (payment?.status === "rejected") status = "rejected";
+      else status = today > dueDate ? "overdue" : "unpaid";
+
+      const daysOverdue =
+        status === "overdue"
+          ? Math.floor(
+              (today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24),
+            )
+          : 0;
+
+      periods.push({
+        month,
+        monthLabel: formatMonthLabel(month),
+        dueDate: dueDate.toISOString(),
+        daysOverdue,
+        status,
+        payment,
+        rentAmount: tenant.rentAmount,
+      });
+
+      monthIdx++;
+      if (monthIdx > 11) {
+        monthIdx = 0;
+        year++;
+      }
+    }
+
+    return periods;
+  }
+
+  // Billing periods for one tenant (admin or tenant)
+  app.get("/api/tenants/:id/billing-periods", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const tenant = await storage.getTenant(id);
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
+
+      const dueDaySetting = await storage.getSetting("payment_due_day");
+      const dueDay = clampDueDay(dueDaySetting?.value);
+      const payments = await storage.getPaymentsByTenantId(id);
+
+      const periods = await buildBillingPeriodsForTenant(
+        tenant as any,
+        payments as any,
+        dueDay,
+        new Date(),
+      );
+      res.json({ tenant, periods });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Billing periods for the logged-in tenant (by userId)
+  app.get("/api/tenant/billing-periods", async (req, res) => {
+    try {
+      const userId = parseInt(req.query.userId as string, 10);
+      const tenant = await storage.getTenantByUserId(userId);
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
+
+      const dueDaySetting = await storage.getSetting("payment_due_day");
+      const dueDay = clampDueDay(dueDaySetting?.value);
+      const payments = await storage.getPaymentsByTenantId(tenant.id);
+
+      const periods = await buildBillingPeriodsForTenant(
+        tenant as any,
+        payments as any,
+        dueDay,
+        new Date(),
+      );
+      res.json({ tenant, periods });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Overdue payments endpoint - now spans ALL months from move-in to today
   app.get("/api/payments/overdue", async (req, res) => {
     try {
       const tenantsList = await storage.getAllTenants();
-      
-      const dueDaySetting = await storage.getSetting('payment_due_day');
-      const parsedDueDay = dueDaySetting ? parseInt(dueDaySetting.value, 10) : NaN;
-      const dueDay = isNaN(parsedDueDay) || parsedDueDay < 1 || parsedDueDay > 28 ? 5 : parsedDueDay;
-      
+
+      const dueDaySetting = await storage.getSetting("payment_due_day");
+      const dueDay = clampDueDay(dueDaySetting?.value);
       const today = new Date();
-      const currentYear = today.getFullYear();
-      const currentMonthIndex = today.getMonth();
-      const currentMonth = `${currentYear}-${String(currentMonthIndex + 1).padStart(2, "0")}`;
-      
-      const overdueList = [];
-      
+
+      const overdueList: Array<{
+        tenant: any;
+        month: string;
+        monthLabel: string;
+        dueDate: string;
+        daysOverdue: number;
+        rentAmount: string;
+      }> = [];
+
       for (const tenant of tenantsList) {
-        const monthPayments = await storage.getPaymentsByTenantId(tenant.id);
-        const hasVerifiedCurrentMonthPayment = monthPayments.some(
-          (payment) => payment.month === currentMonth && payment.status === "verified"
+        const payments = await storage.getPaymentsByTenantId(tenant.id);
+        const periods = await buildBillingPeriodsForTenant(
+          tenant as any,
+          payments as any,
+          dueDay,
+          today,
         );
 
-        if (!hasVerifiedCurrentMonthPayment && today.getDate() > dueDay) {
-          const dueDate = new Date(currentYear, currentMonthIndex, dueDay);
-          const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-
-          overdueList.push({
-            tenant,
-            month: currentMonth,
-            dueDate: dueDate.toISOString(),
-            daysOverdue,
-            rentAmount: tenant.rentAmount,
-          });
+        for (const period of periods) {
+          if (period.status === "overdue") {
+            overdueList.push({
+              tenant,
+              month: period.month,
+              monthLabel: period.monthLabel,
+              dueDate: period.dueDate,
+              daysOverdue: period.daysOverdue,
+              rentAmount: tenant.rentAmount,
+            });
+          }
         }
       }
-      
+
+      // Sort by most overdue first
+      overdueList.sort((a, b) => b.daysOverdue - a.daysOverdue);
+
       res.json(overdueList);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Bulk billing summary across all tenants (admin view)
+  app.get("/api/admin/billing-summary", async (req, res) => {
+    try {
+      const tenantsList = await storage.getAllTenants();
+      const dueDaySetting = await storage.getSetting("payment_due_day");
+      const dueDay = clampDueDay(dueDaySetting?.value);
+      const today = new Date();
+
+      const summaries = await Promise.all(
+        tenantsList.map(async (tenant) => {
+          const payments = await storage.getPaymentsByTenantId(tenant.id);
+          const periods = await buildBillingPeriodsForTenant(
+            tenant as any,
+            payments as any,
+            dueDay,
+            today,
+          );
+          const rentNum = parseFloat(tenant.rentAmount) || 0;
+          const totalUnpaid = periods.filter(
+            (p) => p.status === "unpaid" || p.status === "overdue" || p.status === "rejected",
+          ).length;
+          const totalOverdue = periods.filter((p) => p.status === "overdue").length;
+          const totalDue = totalUnpaid * rentNum;
+          return { tenant, totalUnpaid, totalOverdue, totalDue, periods };
+        }),
+      );
+
+      // Sort: most overdue first, then most unpaid, then by name
+      summaries.sort((a, b) => {
+        if (b.totalOverdue !== a.totalOverdue) return b.totalOverdue - a.totalOverdue;
+        if (b.totalUnpaid !== a.totalUnpaid) return b.totalUnpaid - a.totalUnpaid;
+        return a.tenant.fullName.localeCompare(b.tenant.fullName);
+      });
+
+      res.json(summaries);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Send SMS reminder for an unpaid/overdue month
+  app.post("/api/payments/remind", async (req, res) => {
+    try {
+      const { tenantId, month } = req.body || {};
+      if (!tenantId || !month || !/^\d{4}-\d{2}$/.test(String(month))) {
+        return res
+          .status(400)
+          .json({ message: "tenantId and month (YYYY-MM) are required" });
+      }
+
+      const tenant = await storage.getTenant(parseInt(String(tenantId), 10));
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
+      if (!tenant.contact) {
+        return res
+          .status(400)
+          .json({ message: "Tenant has no contact number on file" });
+      }
+
+      const dueDaySetting = await storage.getSetting("payment_due_day");
+      const dueDay = clampDueDay(dueDaySetting?.value);
+      const [yStr, mStr] = String(month).split("-");
+      const dueDate = new Date(parseInt(yStr, 10), parseInt(mStr, 10) - 1, dueDay);
+      const today = new Date();
+      const daysOverdue = Math.max(
+        0,
+        Math.floor(
+          (today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24),
+        ),
+      );
+
+      const result = await SMSService.notifyPaymentReminder(
+        tenant.contact,
+        tenant.fullName,
+        formatMonthLabel(String(month)),
+        tenant.rentAmount,
+        daysOverdue,
+      );
+
+      if (!result.success) {
+        return res
+          .status(502)
+          .json({ message: result.error || "Failed to send SMS" });
+      }
+      res.json({ success: true, message: "Reminder sent" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

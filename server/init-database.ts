@@ -25,8 +25,28 @@ export async function initializeDatabase() {
         unit_id TEXT NOT NULL,
         occupation TEXT,
         rent_amount DECIMAL(10, 2) NOT NULL,
-        emergency_contact TEXT
+        emergency_contact TEXT,
+        move_in_date DATE
       )
+    `);
+
+    // Add move_in_date column to existing tenants tables (idempotent)
+    await db.execute(sql`
+      ALTER TABLE tenants ADD COLUMN IF NOT EXISTS move_in_date DATE
+    `);
+
+    // Backfill move_in_date from earliest payment month (or today if no payments)
+    await db.execute(sql`
+      UPDATE tenants t
+      SET move_in_date = COALESCE(
+        (
+          SELECT to_date(MIN(p.month) || '-01', 'YYYY-MM-DD')
+          FROM payments p
+          WHERE p.tenant_id = t.id
+        ),
+        CURRENT_DATE
+      )
+      WHERE t.move_in_date IS NULL
     `);
     
     await db.execute(sql`

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, Pencil, Trash2, User, Building } from "lucide-react";
+import { DataTablePagination } from "@/components/DataTablePagination";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -25,6 +26,7 @@ const tenantSchema = z.object({
   occupation: z.string().optional(),
   rentAmount: z.string().min(1, "Rent amount is required"),
   emergencyContact: z.string().optional(),
+  moveInDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Move-in date is required"),
 }).refine((data) => {
   if (data.password.length > 0 && data.password.length < 6) {
     return false;
@@ -79,8 +81,21 @@ export default function Tenants() {
       occupation: "",
       rentAmount: "",
       emergencyContact: "",
+      moveInDate: new Date().toISOString().slice(0, 10),
     },
   });
+
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+  const sortedTenants = useMemo(() => tenants ?? [], [tenants]);
+  const pagedTenants = useMemo(
+    () => sortedTenants.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [sortedTenants, page],
+  );
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(sortedTenants.length / PAGE_SIZE));
+    if (page > totalPages) setPage(totalPages);
+  }, [sortedTenants.length, page]);
 
   const createMutation = useMutation({
     mutationFn: async (data: TenantFormData) => {
@@ -142,6 +157,7 @@ export default function Tenants() {
       occupation: tenant.occupation || "",
       rentAmount: tenant.rentAmount,
       emergencyContact: tenant.emergencyContact || "",
+      moveInDate: (tenant as any).moveInDate || new Date().toISOString().slice(0, 10),
     });
     setIsOpen(true);
   };
@@ -353,19 +369,34 @@ export default function Tenants() {
                     />
                   </div>
 
-                  <FormField
-                    control={form.control}
-                    name="emergencyContact"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Emergency Contact (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Emergency contact number" data-testid="input-emergency-contact" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="emergencyContact"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Emergency Contact (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Emergency contact number" data-testid="input-emergency-contact" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="moveInDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Move-in Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" data-testid="input-move-in-date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={handleClose}>
@@ -398,52 +429,67 @@ export default function Tenants() {
         <CardContent>
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading tenants...</div>
-          ) : tenants && tenants.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Unit ID</TableHead>
-                    <TableHead>Full Name</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Occupation</TableHead>
-                    <TableHead className="text-right">Monthly Rent</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tenants.map((tenant) => (
-                    <TableRow key={tenant.id} data-testid={`row-tenant-${tenant.id}`}>
-                      <TableCell className="font-medium">{tenant.unitId}</TableCell>
-                      <TableCell>{tenant.fullName}</TableCell>
-                      <TableCell>{tenant.contact}</TableCell>
-                      <TableCell>{tenant.occupation || "—"}</TableCell>
-                      <TableCell className="text-right font-semibold">₱{tenant.rentAmount}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(tenant)}
-                            data-testid={`button-edit-${tenant.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setDeleteId(tenant.id)}
-                            data-testid={`button-delete-${tenant.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
+          ) : sortedTenants.length > 0 ? (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Unit ID</TableHead>
+                      <TableHead>Full Name</TableHead>
+                      <TableHead>Contact</TableHead>
+                      <TableHead>Move-in</TableHead>
+                      <TableHead>Occupation</TableHead>
+                      <TableHead className="text-right">Monthly Rent</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedTenants.map((tenant) => (
+                      <TableRow key={tenant.id} data-testid={`row-tenant-${tenant.id}`}>
+                        <TableCell className="font-medium">{tenant.unitId}</TableCell>
+                        <TableCell>{tenant.fullName}</TableCell>
+                        <TableCell>{tenant.contact}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground" data-testid={`text-move-in-${tenant.id}`}>
+                          {(tenant as any).moveInDate
+                            ? new Date((tenant as any).moveInDate + "T00:00:00").toLocaleDateString()
+                            : "—"}
+                        </TableCell>
+                        <TableCell>{tenant.occupation || "—"}</TableCell>
+                        <TableCell className="text-right font-semibold">₱{tenant.rentAmount}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEdit(tenant)}
+                              data-testid={`button-edit-${tenant.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setDeleteId(tenant.id)}
+                              data-testid={`button-delete-${tenant.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <DataTablePagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                totalItems={sortedTenants.length}
+                onPageChange={setPage}
+                testIdPrefix="pagination-tenants"
+              />
+            </>
           ) : (
             <div className="text-center py-12">
               <User className="h-12 w-12 mx-auto text-muted-foreground mb-4" />

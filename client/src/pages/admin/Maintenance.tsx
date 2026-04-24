@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Eye } from "lucide-react";
+import { DataTablePagination } from "@/components/DataTablePagination";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,6 +21,18 @@ export default function AdminMaintenance() {
   const { data: reports, isLoading } = useQuery<MaintenanceReportWithTenant[]>({
     queryKey: ["/api/maintenance"],
   });
+
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+  const sortedReports = useMemo(() => reports ?? [], [reports]);
+  const pagedReports = useMemo(
+    () => sortedReports.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [sortedReports, page],
+  );
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(sortedReports.length / PAGE_SIZE));
+    if (page > totalPages) setPage(totalPages);
+  }, [sortedReports.length, page]);
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
@@ -52,7 +65,7 @@ export default function AdminMaintenance() {
         <CardContent>
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading reports...</div>
-          ) : reports && reports.length > 0 ? (
+          ) : sortedReports.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -67,7 +80,7 @@ export default function AdminMaintenance() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {reports.map((report) => (
+                  {pagedReports.map((report) => (
                     <TableRow key={report.id} data-testid={`row-maintenance-${report.id}`}>
                       <TableCell className="font-medium">{report.tenant.fullName}</TableCell>
                       <TableCell>{report.tenant.unitId}</TableCell>
@@ -126,6 +139,13 @@ export default function AdminMaintenance() {
                   ))}
                 </TableBody>
               </Table>
+              <DataTablePagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                totalItems={sortedReports.length}
+                onPageChange={setPage}
+                testIdPrefix="pagination-maintenance"
+              />
             </div>
           ) : (
             <div className="text-center py-12">

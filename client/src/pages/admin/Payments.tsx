@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { Fragment, useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { CheckCircle, XCircle, FileImage, Eye, Search, AlertTriangle, Plus } from "lucide-react";
+import { CheckCircle, XCircle, FileImage, Eye, Search, AlertTriangle, Plus, Filter, MessageSquare, ChevronDown, ChevronRight as ChevronRightIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,21 +9,42 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StatusBadge } from "@/components/StatusBadge";
+import { DataTablePagination } from "@/components/DataTablePagination";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { PaymentWithTenant, Tenant } from "@shared/schema";
+import type { PaymentWithTenant, Tenant, Payment } from "@shared/schema";
 
 interface OverduePayment {
   tenant: Tenant;
   month: string;
+  monthLabel?: string;
   dueDate: string;
   daysOverdue: number;
   rentAmount: string;
+}
+
+interface BillingPeriod {
+  month: string;
+  monthLabel: string;
+  dueDate: string;
+  daysOverdue: number;
+  status: "paid" | "pending" | "rejected" | "unpaid" | "overdue";
+  payment: Payment | null;
+  rentAmount: string;
+}
+
+interface TenantBillingSummary {
+  tenant: Tenant;
+  totalUnpaid: number;
+  totalOverdue: number;
+  totalDue: number;
+  periods: BillingPeriod[];
 }
 
 const markPaidSchema = z.object({
@@ -47,6 +68,13 @@ export default function AdminPayments() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isMarkPaidOpen, setIsMarkPaidOpen] = useState(false);
   const [rejectingPaymentId, setRejectingPaymentId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("submissions");
+  const [billingSearch, setBillingSearch] = useState<string>("");
+  const [billingFilter, setBillingFilter] = useState<string>("with-balance");
+  const [expandedTenantId, setExpandedTenantId] = useState<number | null>(null);
+  const [submissionsPage, setSubmissionsPage] = useState(1);
+  const [billingPage, setBillingPage] = useState(1);
+  const PAGE_SIZE = 10;
   const { toast } = useToast();
 
   const rejectForm = useForm<RejectFormData>({
@@ -75,13 +103,30 @@ export default function AdminPayments() {
     queryKey: ["/api/payments/overdue"],
   });
 
+  const { data: billingSummaries, isLoading: billingLoading } = useQuery<TenantBillingSummary[]>({
+    queryKey: ["/api/admin/billing-summary"],
+  });
+
   const invalidatePayments = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
     queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
     queryClient.invalidateQueries({ queryKey: ["/api/payments/overdue"] });
     queryClient.invalidateQueries({ queryKey: ["/api/tenant/dashboard"] });
     queryClient.invalidateQueries({ queryKey: ["/api/tenant/payments"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tenants"] });
   };
+
+  const remindMutation = useMutation({
+    mutationFn: async ({ tenantId, month }: { tenantId: number; month: string }) => {
+      return await apiRequest("POST", "/api/payments/remind", { tenantId, month });
+    },
+    onSuccess: () => {
+      toast({ title: "Reminder sent", description: "An SMS reminder has been sent to the tenant." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send SMS", description: error.message, variant: "destructive" });
+    },
+  });
 
   const verifyMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
@@ -180,6 +225,40 @@ export default function AdminPayments() {
 
   const hasActiveFilters = statusFilter !== "all" || tenantFilter !== "all" || monthFilter !== "all" || searchTerm !== "";
 
+  const pagedSubmissions = useMemo(
+    () => filteredPayments.slice((submissionsPage - 1) * PAGE_SIZE, submissionsPage * PAGE_SIZE),
+    [filteredPayments, submissionsPage],
+  );
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredPayments.length / PAGE_SIZE));
+    if (submissionsPage > totalPages) setSubmissionsPage(totalPages);
+  }, [filteredPayments.length, submissionsPage]);
+  useEffect(() => { setSubmissionsPage(1); }, [statusFilter, tenantFilter, monthFilter, searchTerm]);
+
+  const filteredBilling = useMemo(() => {
+    if (!billingSummaries) return [] as TenantBillingSummary[];
+    const term = billingSearch.trim().toLowerCase();
+    return billingSummaries.filter((s) => {
+      if (billingFilter === "with-balance" && s.totalUnpaid === 0) return false;
+      if (billingFilter === "overdue" && s.totalOverdue === 0) return false;
+      if (billingFilter === "paid-up" && s.totalUnpaid > 0) return false;
+      if (term && !s.tenant.fullName.toLowerCase().includes(term) && !s.tenant.unitId.toLowerCase().includes(term)) {
+        return false;
+      }
+      return true;
+    });
+  }, [billingSummaries, billingSearch, billingFilter]);
+
+  const pagedBilling = useMemo(
+    () => filteredBilling.slice((billingPage - 1) * PAGE_SIZE, billingPage * PAGE_SIZE),
+    [filteredBilling, billingPage],
+  );
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredBilling.length / PAGE_SIZE));
+    if (billingPage > totalPages) setBillingPage(totalPages);
+  }, [filteredBilling.length, billingPage]);
+  useEffect(() => { setBillingPage(1); }, [billingSearch, billingFilter]);
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -203,13 +282,22 @@ export default function AdminPayments() {
               Overdue Payments Alert
             </CardTitle>
             <CardDescription>
-              {overduePayments.length} tenant{overduePayments.length > 1 ? 's have' : ' has'} overdue payments
+              {overduePayments.length} unpaid month{overduePayments.length > 1 ? "s" : ""} across tenants
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-2 h-auto py-0 px-2 underline text-orange-700 dark:text-orange-400 hover:bg-transparent"
+                onClick={() => setActiveTab("billing")}
+                data-testid="link-view-billing-status"
+              >
+                View Billing Status
+              </Button>
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               {overduePayments.slice(0, 5).map((item, index) => (
-                <div 
+                <div
                   key={index}
                   className="flex items-center justify-between p-3 bg-white dark:bg-background rounded-lg"
                 >
@@ -232,6 +320,13 @@ export default function AdminPayments() {
         </Card>
       )}
 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="submissions" data-testid="tab-submissions">Submissions</TabsTrigger>
+          <TabsTrigger value="billing" data-testid="tab-billing">Billing Status</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="submissions">
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -321,7 +416,7 @@ export default function AdminPayments() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredPayments.map((payment) => (
+                  {pagedSubmissions.map((payment) => (
                     <TableRow key={payment.id} data-testid={`row-payment-${payment.id}`}>
                       <TableCell className="font-medium">{payment.tenant.fullName}</TableCell>
                       <TableCell>{payment.tenant.unitId}</TableCell>
@@ -382,6 +477,13 @@ export default function AdminPayments() {
                   ))}
                 </TableBody>
               </Table>
+              <DataTablePagination
+                page={submissionsPage}
+                pageSize={PAGE_SIZE}
+                totalItems={filteredPayments.length}
+                onPageChange={setSubmissionsPage}
+                testIdPrefix="pagination-submissions"
+              />
             </div>
           ) : (
             <div className="text-center py-12">
@@ -390,7 +492,7 @@ export default function AdminPayments() {
                 {hasActiveFilters ? "No payments match your filters" : "No payment submissions"}
               </h3>
               <p className="text-sm text-muted-foreground">
-                {hasActiveFilters 
+                {hasActiveFilters
                   ? "Try adjusting your filters to see more results"
                   : "Payment proofs will appear here once tenants upload them"
                 }
@@ -399,6 +501,236 @@ export default function AdminPayments() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="billing">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <CardTitle>Billing Status</CardTitle>
+                  <CardDescription>
+                    See unpaid months for every tenant and send SMS reminders
+                  </CardDescription>
+                </div>
+                <Badge variant="secondary" data-testid="badge-billing-count">
+                  {filteredBilling.length} of {billingSummaries?.length || 0} tenants
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-4 mb-6">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by tenant name or unit..."
+                    value={billingSearch}
+                    onChange={(e) => setBillingSearch(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-search-billing"
+                  />
+                </div>
+                <Select value={billingFilter} onValueChange={setBillingFilter}>
+                  <SelectTrigger className="w-[200px]" data-testid="select-billing-filter">
+                    <SelectValue placeholder="Filter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="with-balance">With Balance</SelectItem>
+                    <SelectItem value="overdue">Overdue Only</SelectItem>
+                    <SelectItem value="paid-up">Paid Up</SelectItem>
+                    <SelectItem value="all">All Tenants</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {billingLoading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading billing status...</div>
+              ) : filteredBilling.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-8"></TableHead>
+                        <TableHead>Tenant</TableHead>
+                        <TableHead>Unit</TableHead>
+                        <TableHead className="text-right">Unpaid Months</TableHead>
+                        <TableHead className="text-right">Overdue Months</TableHead>
+                        <TableHead className="text-right">Total Due</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pagedBilling.map((summary) => {
+                        const isExpanded = expandedTenantId === summary.tenant.id;
+                        const unpaidPeriods = summary.periods.filter(
+                          (p) => p.status === "unpaid" || p.status === "overdue" || p.status === "rejected",
+                        );
+                        return (
+                          <Fragment key={summary.tenant.id}>
+                            <TableRow
+                              data-testid={`row-billing-${summary.tenant.id}`}
+                              className={summary.totalOverdue > 0 ? "bg-orange-50/50 dark:bg-orange-950/10" : ""}
+                            >
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    setExpandedTenantId(isExpanded ? null : summary.tenant.id)
+                                  }
+                                  disabled={unpaidPeriods.length === 0}
+                                  data-testid={`button-expand-${summary.tenant.id}`}
+                                  aria-label={isExpanded ? "Collapse" : "Expand"}
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRightIcon className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </TableCell>
+                              <TableCell className="font-medium">{summary.tenant.fullName}</TableCell>
+                              <TableCell>{summary.tenant.unitId}</TableCell>
+                              <TableCell
+                                className="text-right"
+                                data-testid={`text-unpaid-count-${summary.tenant.id}`}
+                              >
+                                {summary.totalUnpaid > 0 ? (
+                                  <Badge variant="secondary">{summary.totalUnpaid}</Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">0</span>
+                                )}
+                              </TableCell>
+                              <TableCell
+                                className="text-right"
+                                data-testid={`text-overdue-count-${summary.tenant.id}`}
+                              >
+                                {summary.totalOverdue > 0 ? (
+                                  <Badge variant="destructive">{summary.totalOverdue}</Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">0</span>
+                                )}
+                              </TableCell>
+                              <TableCell
+                                className="text-right font-semibold"
+                                data-testid={`text-total-due-${summary.tenant.id}`}
+                              >
+                                ₱{summary.totalDue.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {summary.totalUnpaid > 0 ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const target =
+                                        summary.periods.find((p) => p.status === "overdue") ||
+                                        summary.periods.find(
+                                          (p) => p.status === "unpaid" || p.status === "rejected",
+                                        );
+                                      if (target) {
+                                        remindMutation.mutate({
+                                          tenantId: summary.tenant.id,
+                                          month: target.month,
+                                        });
+                                      }
+                                    }}
+                                    disabled={remindMutation.isPending}
+                                    data-testid={`button-remind-${summary.tenant.id}`}
+                                  >
+                                    <MessageSquare className="h-4 w-4 mr-1" />
+                                    Remind
+                                  </Button>
+                                ) : (
+                                  <Badge variant="outline" className="text-green-600 border-green-200">
+                                    Paid up
+                                  </Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                            {isExpanded && unpaidPeriods.length > 0 && (
+                              <TableRow
+                                key={`${summary.tenant.id}-expanded`}
+                                data-testid={`row-billing-expanded-${summary.tenant.id}`}
+                              >
+                                <TableCell colSpan={7} className="bg-muted/30 p-4">
+                                  <div className="space-y-2">
+                                    <p className="text-sm font-medium mb-2">Unpaid months</p>
+                                    {unpaidPeriods.map((period) => (
+                                      <div
+                                        key={period.month}
+                                        className="flex items-center justify-between p-3 bg-background rounded-md border"
+                                        data-testid={`row-period-${summary.tenant.id}-${period.month}`}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <div>
+                                            <p className="font-medium">{period.monthLabel}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                              Due {new Date(period.dueDate + "T00:00:00").toLocaleDateString()}
+                                            </p>
+                                          </div>
+                                          {period.status === "overdue" && (
+                                            <Badge variant="destructive">
+                                              {period.daysOverdue} days overdue
+                                            </Badge>
+                                          )}
+                                          {period.status === "rejected" && (
+                                            <Badge variant="destructive">Rejected</Badge>
+                                          )}
+                                          {period.status === "unpaid" && (
+                                            <Badge variant="outline">Unpaid</Badge>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                          <p className="font-semibold">₱{period.rentAmount}</p>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                              remindMutation.mutate({
+                                                tenantId: summary.tenant.id,
+                                                month: period.month,
+                                              })
+                                            }
+                                            disabled={remindMutation.isPending}
+                                            data-testid={`button-remind-period-${summary.tenant.id}-${period.month}`}
+                                          >
+                                            <MessageSquare className="h-4 w-4 mr-1" />
+                                            Remind
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </Fragment>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                  <DataTablePagination
+                    page={billingPage}
+                    pageSize={PAGE_SIZE}
+                    totalItems={filteredBilling.length}
+                    onPageChange={setBillingPage}
+                    testIdPrefix="pagination-billing"
+                  />
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <CheckCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="font-semibold mb-2">No tenants match your filter</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Try changing the filter or search to see other tenants
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={selectedImage !== null} onOpenChange={() => setSelectedImage(null)}>
         <DialogContent className="max-w-3xl">

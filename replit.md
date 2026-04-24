@@ -6,6 +6,17 @@ RETMOT is a comprehensive apartment management system designed for property admi
 
 The system provides administrators with complete oversight of tenant information, payment verification, maintenance requests, and reporting capabilities. Tenants can submit payment proofs, report maintenance issues, manage their profile, and accept rental agreements (Kasunduan).
 
+## Recent Changes (April 2026)
+
+### Accurate Due Dates, Pagination, and SMS Reminders
+- Added `moveInDate` (date) column to `tenants`; backfilled existing rows from earliest payment month or today; included idempotent ALTER + backfill in `server/init-database.ts`.
+- New billing-period engine (`buildBillingPeriodsForTenant` in `server/routes.ts`) generates one period per month from each tenant's move-in date through the current month, applying the configurable `payment_due_day` and assigning `paid` / `pending` / `rejected` / `unpaid` / `overdue` status per month.
+- Endpoints: `GET /api/tenants/:id/billing-periods`, `GET /api/tenant/billing-periods?userId=`, `GET /api/admin/billing-summary` (per-tenant unpaid/overdue counts and total due), and rewrote `GET /api/payments/overdue` to span all months from move-in to today instead of only the current month.
+- Admin Payments page now has tabs: "Submissions" (existing list, paginated) and "Billing Status" (per-tenant rows with unpaid/overdue counts, expandable to show each unpaid month, with per-row and per-month "Remind" buttons).
+- SMS reminders: `POST /api/payments/remind` (`{tenantId, month}`) sends a Tagalog reminder via PhilSMS using `notifyPaymentReminder` in `server/services/sms.ts`.
+- 10-per-page pagination added to admin Tenants, admin Maintenance, and both Payments tables via reusable `client/src/components/DataTablePagination.tsx`.
+- Tenant create/edit form now includes Move-in Date (admin-only field).
+
 ## Recent Changes (December 2025)
 
 ### GCash Payment Integration

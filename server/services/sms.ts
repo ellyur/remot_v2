@@ -111,4 +111,25 @@ export class SMSService {
       message,
     });
   }
+
+  static async notifyPaymentReminder(
+    tenantPhone: string,
+    tenantName: string,
+    monthLabel: string,
+    amount: string,
+    daysOverdue: number,
+  ): Promise<any> {
+    const overduePart =
+      daysOverdue > 0
+        ? `ay may ${daysOverdue} araw na overdue`
+        : `ay nakatakdang bayaran`;
+    const message =
+      `Magandang araw ${tenantName}! Paalala lang po na ang renta ` +
+      `para sa ${monthLabel} (P${amount}) ${overduePart}. ` +
+      `Salamat po sa inyong agarang pagbabayad!`;
+    return this.sendSMS({
+      recipients: tenantPhone,
+      message,
+    });
+  }
 }

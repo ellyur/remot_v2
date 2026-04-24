@@ -173,7 +173,7 @@ export default function TenantProfile() {
               Your personal information
             </p>
           </div>
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:justify-end min-w-0">
+          <div className="grid grid-cols-1 gap-2 w-full sm:flex sm:flex-wrap sm:w-auto sm:justify-end min-w-0">
             <Button
               variant="outline"
               size="sm"
@@ -190,7 +190,7 @@ export default function TenantProfile() {
               data-testid="button-edit-profile"
             >
               <Edit className="h-4 w-4 mr-2" />
-              Edit
+              Manage Your Account
             </Button>
             <Button
               variant="destructive"

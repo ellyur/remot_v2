@@ -143,6 +143,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteTenant(id: number): Promise<void> {
+    // Snapshot tenant info onto payments first so financial history is preserved
+    const tenant = await this.getTenant(id);
+    if (tenant) {
+      await db
+        .update(payments)
+        .set({
+          tenantNameSnapshot: tenant.fullName,
+          unitIdSnapshot: tenant.unitId,
+        })
+        .where(eq(payments.tenantId, id));
+    }
     await db.delete(tenants).where(eq(tenants.id, id));
   }
 
@@ -165,7 +176,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
-    const [payment] = await db.insert(payments).values(insertPayment).returning();
+    let tenantNameSnapshot = insertPayment.tenantNameSnapshot ?? null;
+    let unitIdSnapshot = insertPayment.unitIdSnapshot ?? null;
+
+    if ((!tenantNameSnapshot || !unitIdSnapshot) && insertPayment.tenantId) {
+      const tenant = await this.getTenant(insertPayment.tenantId);
+      if (tenant) {
+        tenantNameSnapshot = tenantNameSnapshot ?? tenant.fullName;
+        unitIdSnapshot = unitIdSnapshot ?? tenant.unitId;
+      }
+    }
+
+    const [payment] = await db
+      .insert(payments)
+      .values({ ...insertPayment, tenantNameSnapshot, unitIdSnapshot })
+      .returning();
     return payment;
   }
 

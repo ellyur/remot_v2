@@ -35,7 +35,9 @@ export const tenants = pgTable("tenants", {
 // Payments table - track payment proofs
 export const payments = pgTable("payments", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "set null" }),
+  tenantNameSnapshot: text("tenant_name_snapshot"),
+  unitIdSnapshot: text("unit_id_snapshot"),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   month: text("month").notNull(), // e.g., "2025-01" for January 2025
   dateUploaded: timestamp("date_uploaded").notNull().defaultNow(),
@@ -148,6 +150,7 @@ export const insertTenantSchema = createInsertSchema(tenants, {
 }).omit({ id: true });
 
 export const insertPaymentSchema = createInsertSchema(payments, {
+  tenantId: z.number().int().positive("Tenant is required"),
   amount: z.string().min(1, "Amount is required"),
   month: z.string().regex(/^\d{4}-\d{2}$/, "Month must be in YYYY-MM format"),
 }).omit({ id: true, dateUploaded: true });

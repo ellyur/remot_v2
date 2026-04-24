@@ -268,12 +268,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/payments", async (req, res) => {
     try {
       const paymentsList = await storage.getAllPayments();
-      
-      // Fetch tenant details for each payment
+
+      // Fetch tenant details for each payment, falling back to snapshot for deleted tenants
       const paymentsWithTenant = await Promise.all(
         paymentsList.map(async (payment) => {
-          const tenant = await storage.getTenant(payment.tenantId);
-          return { ...payment, tenant };
+          let tenant = payment.tenantId
+            ? await storage.getTenant(payment.tenantId)
+            : undefined;
+
+          if (!tenant) {
+            // Tenant was deleted — reconstruct a minimal record from snapshots
+            tenant = {
+              id: payment.tenantId ?? 0,
+              userId: 0,
+              fullName: payment.tenantNameSnapshot ?? "Deleted tenant",
+              contact: "",
+              unitId: payment.unitIdSnapshot ?? "",
+              occupation: null,
+              rentAmount: "0",
+              emergencyContact: null,
+              moveInDate: null,
+            } as any;
+          }
+
+          return { ...payment, tenant, tenantDeleted: !payment.tenantId };
         })
       );
 
@@ -410,7 +428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Send SMS notification to tenant when payment is verified
-      if (status === "verified") {
+      if (status === "verified" && payment.tenantId) {
         const tenant = await storage.getTenant(payment.tenantId);
         if (tenant && tenant.contact) {
           await SMSService.notifyPaymentVerified(tenant.contact, tenant.fullName, payment.month);
@@ -626,8 +644,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pendingMaintenance: maintenanceList.filter(r => r.status === "pending").length,
         recentPayments: await Promise.all(
           paymentsList.slice(0, 5).map(async (payment) => {
-            const tenant = await storage.getTenant(payment.tenantId);
-            return { ...payment, tenant };
+            const tenant = payment.tenantId
+              ? await storage.getTenant(payment.tenantId)
+              : undefined;
+            return {
+              ...payment,
+              tenant: tenant ?? {
+                fullName: payment.tenantNameSnapshot ?? "Deleted tenant",
+                unitId: payment.unitIdSnapshot ?? "",
+              },
+              tenantDeleted: !payment.tenantId,
+            };
           })
         ),
         recentMaintenance: await Promise.all(

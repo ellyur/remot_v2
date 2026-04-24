@@ -35,7 +35,7 @@ interface BillingPeriod {
   monthLabel: string;
   dueDate: string;
   daysOverdue: number;
-  status: "paid" | "pending" | "rejected" | "unpaid" | "overdue";
+  status: "paid" | "pending" | "rejected" | "unpaid" | "overdue" | "upcoming";
   payment: {
     id: number;
     amount: string;
@@ -178,6 +178,8 @@ export default function TenantDashboard() {
                     ? "bg-yellow-50/50 dark:bg-yellow-950/10 border-yellow-200 dark:border-yellow-900"
                     : status === "rejected" || status === "overdue"
                     ? "bg-red-50/50 dark:bg-red-950/10 border-red-200 dark:border-red-900"
+                    : status === "upcoming"
+                    ? "bg-muted/20 border-dashed opacity-70"
                     : "bg-muted/30 border-dashed";
 
                 const statusLabel =
@@ -189,6 +191,8 @@ export default function TenantDashboard() {
                     ? "Rejected"
                     : status === "overdue"
                     ? `Overdue${period.daysOverdue ? ` (${period.daysOverdue}d)` : ""}`
+                    : status === "upcoming"
+                    ? "Upcoming"
                     : "Unpaid";
 
                 return (

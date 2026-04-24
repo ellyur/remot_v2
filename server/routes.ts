@@ -1092,7 +1092,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     monthLabel: string; // "March 2026"
     dueDate: string; // ISO
     daysOverdue: number;
-    status: "paid" | "pending" | "rejected" | "unpaid" | "overdue";
+    status: "paid" | "pending" | "rejected" | "unpaid" | "overdue" | "upcoming";
     payment: any | null;
     rentAmount: string;
   };
@@ -1135,8 +1135,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
-    const endYear = today.getFullYear();
-    const endMonthIdx = today.getMonth();
+    // Show schedule from move-in through the end of next calendar year so
+    // tenants can see upcoming months too (not just billed ones).
+    const endYear = today.getFullYear() + 1;
+    const endMonthIdx = 11;
 
     const paymentByMonth = new Map<string, any>();
     for (const p of payments) {
@@ -1149,6 +1151,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
+    const todayYear = today.getFullYear();
+    const todayMonthIdx = today.getMonth();
+
     const periods: BillingPeriod[] = [];
     while (
       year < endYear ||
@@ -1158,10 +1163,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dueDate = new Date(year, monthIdx, dueDay);
       const payment = paymentByMonth.get(month) || null;
 
+      // A billing month is "current or past" once we've reached its calendar month.
+      const isCurrentOrPastMonth =
+        year < todayYear ||
+        (year === todayYear && monthIdx <= todayMonthIdx);
+
       let status: BillingPeriod["status"];
       if (payment?.status === "verified") status = "paid";
       else if (payment?.status === "pending") status = "pending";
       else if (payment?.status === "rejected") status = "rejected";
+      else if (!isCurrentOrPastMonth) status = "upcoming";
       else status = today > dueDate ? "overdue" : "unpaid";
 
       const daysOverdue =

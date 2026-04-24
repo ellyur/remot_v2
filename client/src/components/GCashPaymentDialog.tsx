@@ -113,7 +113,7 @@ export function GCashPaymentDialog({ open, onOpenChange }: GCashPaymentDialogPro
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Smartphone className="h-5 w-5 text-blue-500" />
@@ -136,7 +136,7 @@ export function GCashPaymentDialog({ open, onOpenChange }: GCashPaymentDialogPro
                     <img 
                       src={gcashQrCode} 
                       alt="GCash QR Code" 
-                      className="w-48 h-48 object-contain"
+                    className="w-56 h-56 object-contain"
                       data-testid="img-gcash-qr"
                     />
                   </div>

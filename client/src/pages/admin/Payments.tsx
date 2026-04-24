@@ -1,13 +1,12 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { CheckCircle, XCircle, FileImage, Eye, Search, AlertTriangle, Plus } from "lucide-react";
+import { CheckCircle, FileImage, Eye, Filter, Search, AlertTriangle, Download, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
@@ -34,11 +33,6 @@ const markPaidSchema = z.object({
 
 type MarkPaidFormData = z.infer<typeof markPaidSchema>;
 
-const rejectSchema = z.object({
-  notes: z.string().min(5, "Please provide at least 5 characters explaining the reason"),
-});
-type RejectFormData = z.infer<typeof rejectSchema>;
-
 export default function AdminPayments() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -46,13 +40,7 @@ export default function AdminPayments() {
   const [monthFilter, setMonthFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isMarkPaidOpen, setIsMarkPaidOpen] = useState(false);
-  const [rejectingPaymentId, setRejectingPaymentId] = useState<number | null>(null);
   const { toast } = useToast();
-
-  const rejectForm = useForm<RejectFormData>({
-    resolver: zodResolver(rejectSchema),
-    defaultValues: { notes: "" },
-  });
 
   const { data: allTenants } = useQuery<Tenant[]>({
     queryKey: ["/api/tenants"],
@@ -75,36 +63,17 @@ export default function AdminPayments() {
     queryKey: ["/api/payments/overdue"],
   });
 
-  const invalidatePayments = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/payments/overdue"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/tenant/dashboard"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/tenant/payments"] });
-  };
-
   const verifyMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
       return await apiRequest("PATCH", `/api/payments/${id}/status`, { status });
     },
     onSuccess: () => {
-      invalidatePayments();
-      toast({ title: "Payment verified" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: async ({ id, notes }: { id: number; notes: string }) => {
-      return await apiRequest("PATCH", `/api/payments/${id}/status`, { status: "rejected", rejectionNotes: notes });
-    },
-    onSuccess: () => {
-      invalidatePayments();
-      toast({ title: "Payment rejected", description: "The tenant will see the rejection reason." });
-      setRejectingPaymentId(null);
-      rejectForm.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments/overdue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenant/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenant/payments"] });
+      toast({ title: "Payment status updated" });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -266,7 +235,6 @@ export default function AdminPayments() {
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="verified">Verified</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
               </SelectContent>
             </Select>
             <Select value={tenantFilter} onValueChange={setTenantFilter}>
@@ -355,25 +323,11 @@ export default function AdminPayments() {
                               variant="outline"
                               size="sm"
                               onClick={() => verifyMutation.mutate({ id: payment.id, status: "verified" })}
-                              disabled={verifyMutation.isPending || rejectMutation.isPending}
+                              disabled={verifyMutation.isPending}
                               data-testid={`button-verify-${payment.id}`}
                             >
-                              <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                              <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
                               Verify
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setRejectingPaymentId(payment.id);
-                                rejectForm.reset();
-                              }}
-                              disabled={verifyMutation.isPending || rejectMutation.isPending}
-                              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                              data-testid={`button-reject-${payment.id}`}
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Reject
                             </Button>
                           </div>
                         )}
@@ -414,67 +368,6 @@ export default function AdminPayments() {
               />
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Reject Payment Dialog */}
-      <Dialog open={rejectingPaymentId !== null} onOpenChange={(open) => { if (!open) { setRejectingPaymentId(null); rejectForm.reset(); } }}>
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <XCircle className="h-5 w-5" />
-              Reject Payment
-            </DialogTitle>
-            <DialogDescription>
-              Provide a reason for rejecting this payment. The tenant will be able to see this note.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...rejectForm}>
-            <form
-              onSubmit={rejectForm.handleSubmit((data) => {
-                if (rejectingPaymentId !== null) {
-                  rejectMutation.mutate({ id: rejectingPaymentId, notes: data.notes });
-                }
-              })}
-              className="space-y-4"
-            >
-              <FormField
-                control={rejectForm.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Rejection Reason</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="e.g. The uploaded image is blurry and unreadable. Please resubmit a clear photo of your receipt."
-                        className="min-h-[100px]"
-                        data-testid="input-rejection-notes"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => { setRejectingPaymentId(null); rejectForm.reset(); }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="destructive"
-                  disabled={rejectMutation.isPending}
-                  data-testid="button-confirm-reject"
-                >
-                  {rejectMutation.isPending ? "Rejecting..." : "Reject Payment"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
         </DialogContent>
       </Dialog>
 

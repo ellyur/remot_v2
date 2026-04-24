@@ -1,12 +1,10 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, Wrench, Calendar, Home, Plus, CheckCircle2, Clock, XCircle, MessageSquare } from "lucide-react";
+import { DollarSign, Wrench, Calendar, Home, Plus, CheckCircle2, Clock } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { StatsCard } from "@/components/StatsCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/StatusBadge";
 
 interface TenantStats {
@@ -20,7 +18,6 @@ interface TenantStats {
     month: string;
     status: string;
     dateUploaded: string;
-    rejectionNotes?: string | null;
   }>;
   recentMaintenance: Array<{
     id: number;
@@ -33,7 +30,6 @@ interface TenantStats {
 export default function TenantDashboard() {
   const [, setLocation] = useLocation();
   const { user, tenant } = useAuth();
-  const [rejectionNote, setRejectionNote] = useState<string | null>(null);
 
   const { data: stats, isLoading } = useQuery<TenantStats>({
     queryKey: [`/api/tenant/dashboard?userId=${user?.id}`],
@@ -150,13 +146,11 @@ export default function TenantDashboard() {
               return (
                 <div 
                   key={month}
-                  className={`p-4 rounded-lg border flex flex-col justify-between min-h-[6rem] ${
+                  className={`p-4 rounded-lg border flex flex-col justify-between h-24 ${
                     payment?.status === 'verified' 
                       ? 'bg-green-50/50 dark:bg-green-950/10 border-green-200 dark:border-green-900' 
                       : payment?.status === 'pending'
                       ? 'bg-yellow-50/50 dark:bg-yellow-950/10 border-yellow-200 dark:border-yellow-900'
-                      : payment?.status === 'rejected'
-                      ? 'bg-red-50/50 dark:bg-red-950/10 border-red-200 dark:border-red-900'
                       : isFuture
                       ? 'bg-muted/30 border-dashed'
                       : 'bg-red-50/50 dark:bg-red-950/10 border-red-200 dark:border-red-900'
@@ -168,29 +162,13 @@ export default function TenantDashboard() {
                       <CheckCircle2 className="h-4 w-4 text-green-600" />
                     ) : payment?.status === 'pending' ? (
                       <Clock className="h-4 w-4 text-yellow-600" />
-                    ) : payment?.status === 'rejected' ? (
-                      <XCircle className="h-4 w-4 text-red-600" />
                     ) : null}
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <div className="flex justify-between items-end">
-                      <span className="text-xs text-muted-foreground">
-                        {payment ? `₱${payment.amount}` : isFuture ? 'Upcoming' : 'Unpaid'}
-                      </span>
-                      {payment && <StatusBadge status={payment.status} />}
-                    </div>
-                    {payment?.status === 'rejected' && payment.rejectionNotes && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-xs px-2 text-red-600 hover:text-red-700 hover:bg-red-50 w-full justify-start"
-                        onClick={() => setRejectionNote(payment.rejectionNotes!)}
-                        data-testid={`button-view-rejection-${payment.id}`}
-                      >
-                        <MessageSquare className="h-3 w-3 mr-1" />
-                        View reason
-                      </Button>
-                    )}
+                  <div className="flex justify-between items-end">
+                    <span className="text-xs text-muted-foreground">
+                      {payment ? `₱${payment.amount}` : isFuture ? 'Upcoming' : 'Unpaid'}
+                    </span>
+                    {payment && <StatusBadge status={payment.status} />}
                   </div>
                 </div>
               );
@@ -211,30 +189,16 @@ export default function TenantDashboard() {
                 {stats.recentPayments.map((payment) => (
                   <div
                     key={payment.id}
-                    className="flex items-center justify-between p-3 rounded-lg border gap-3"
+                    className="flex items-center justify-between p-3 rounded-lg border"
                     data-testid={`payment-${payment.id}`}
                   >
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1">
                       <div className="font-medium">₱{payment.amount}</div>
                       <div className="text-sm text-muted-foreground">
                         {formatMonth(payment.month)} • {new Date(payment.dateUploaded).toLocaleDateString()}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <StatusBadge status={payment.status} />
-                      {payment.status === "rejected" && payment.rejectionNotes && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-xs px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => setRejectionNote(payment.rejectionNotes!)}
-                          data-testid={`button-view-rejection-recent-${payment.id}`}
-                        >
-                          <MessageSquare className="h-3 w-3 mr-1" />
-                          View reason
-                        </Button>
-                      )}
-                    </div>
+                    <StatusBadge status={payment.status} />
                   </div>
                 ))}
               </div>
@@ -278,27 +242,6 @@ export default function TenantDashboard() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Rejection Reason Dialog */}
-      <Dialog open={rejectionNote !== null} onOpenChange={(open) => { if (!open) setRejectionNote(null); }}>
-        <DialogContent className="sm:max-w-[440px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <XCircle className="h-5 w-5" />
-              Payment Rejected
-            </DialogTitle>
-            <DialogDescription>
-              Your admin provided the following reason for rejecting this payment.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-sm text-red-800 dark:text-red-300 whitespace-pre-wrap">
-            {rejectionNote}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Please resubmit your payment proof after addressing the issue above.
-          </p>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

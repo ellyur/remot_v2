@@ -185,7 +185,7 @@ export function GCashPaymentDialog({ open, onOpenChange }: GCashPaymentDialogPro
             {settings?.payment_instructions && (
               <div className="p-4 bg-muted rounded-lg">
                 <p className="text-sm font-medium mb-1">Instructions:</p>
-                <p className="text-sm text-muted-foreground">{settings.payment_instructions}</p>
+                <p className="text-sm text-muted-foreground">Send payment to the landlord's GCash account</p>
               </div>
             )}
 

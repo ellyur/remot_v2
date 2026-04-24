@@ -1034,7 +1034,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Overdue payments endpoint
   app.get("/api/payments/overdue", async (req, res) => {
     try {
-      const paymentsList = await storage.getAllPayments();
       const tenantsList = await storage.getAllTenants();
       
       const dueDaySetting = await storage.getSetting('payment_due_day');
@@ -1044,36 +1043,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const today = new Date();
       const currentYear = today.getFullYear();
       const currentMonthIndex = today.getMonth();
-      const currentDay = today.getDate();
       const currentMonth = `${currentYear}-${String(currentMonthIndex + 1).padStart(2, "0")}`;
-      
-      // Get all tenants who haven't paid for current month
-      const paidTenantIds = new Set(
-        paymentsList
-          .filter(p => p.month === currentMonth && p.status === 'verified')
-          .map(p => p.tenantId)
-      );
       
       const overdueList = [];
       
       for (const tenant of tenantsList) {
-        if (!paidTenantIds.has(tenant.id)) {
+        const monthPayments = await storage.getPaymentsByTenantId(tenant.id);
+        const hasVerifiedCurrentMonthPayment = monthPayments.some(
+          (payment) => payment.month === currentMonth && payment.status === "verified"
+        );
+
+        if (!hasVerifiedCurrentMonthPayment && today.getDate() > dueDay) {
           const dueDate = new Date(currentYear, currentMonthIndex, dueDay);
-          const dueDayPassed = currentDay >= dueDay;
-          const isOverdue = dueDayPassed && today > dueDate;
-          const daysOverdue = isOverdue
-            ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
-            : 0;
-          
-          if (isOverdue) {
-            overdueList.push({
-              tenant,
-              month: currentMonth,
-              dueDate: dueDate.toISOString(),
-              daysOverdue,
-              rentAmount: tenant.rentAmount,
-            });
-          }
+          const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+
+          overdueList.push({
+            tenant,
+            month: currentMonth,
+            dueDate: dueDate.toISOString(),
+            daysOverdue,
+            rentAmount: tenant.rentAmount,
+          });
         }
       }
       

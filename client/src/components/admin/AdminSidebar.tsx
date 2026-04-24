@@ -1,4 +1,5 @@
 import { Home, Users, DollarSign, Wrench, LogOut, Settings, BarChart3 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -52,6 +53,15 @@ const menuItems = [
 export function AdminSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const { data: payments } = useQuery<any[]>({
+    queryKey: ["/api/payments"],
+  });
+  const { data: reports } = useQuery<any[]>({
+    queryKey: ["/api/maintenance"],
+  });
+
+  const newPayments = payments?.filter((payment) => payment.status === "pending").length || 0;
+  const newMaintenance = reports?.filter((report) => report.status === "pending").length || 0;
 
   return (
     <Sidebar>
@@ -71,6 +81,16 @@ export function AdminSidebar() {
                     <Link href={item.url} data-testid={`link-${item.title.toLowerCase()}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
+                      {item.title === "Payments" && newPayments > 0 && (
+                        <Badge variant="destructive" className="ml-auto h-5 min-w-5 px-1 text-xs">
+                          {newPayments}
+                        </Badge>
+                      )}
+                      {item.title === "Maintenance" && newMaintenance > 0 && (
+                        <Badge variant="destructive" className="ml-auto h-5 min-w-5 px-1 text-xs">
+                          {newMaintenance}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

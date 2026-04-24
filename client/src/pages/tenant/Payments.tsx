@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Upload, FileImage, Calendar, Eye, Edit, Trash2, Smartphone } from "lucide-react";
+import { Upload, FileImage, Calendar, Eye, Edit, Trash2, Smartphone, XCircle, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -33,6 +33,7 @@ export default function TenantPayments() {
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [rejectionNote, setRejectionNote] = useState<string | null>(null);
   const { user, tenant } = useAuth();
   const { toast } = useToast();
 
@@ -308,7 +309,21 @@ export default function TenantPayments() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <StatusBadge status={payment.status} />
+                        <div className="flex flex-col gap-1 items-start">
+                          <StatusBadge status={payment.status} />
+                          {payment.status === "rejected" && (payment as any).rejectionNotes && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => setRejectionNote((payment as any).rejectionNotes)}
+                              data-testid={`button-view-rejection-${payment.id}`}
+                            >
+                              <MessageSquare className="h-3 w-3 mr-1" />
+                              View reason
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
@@ -455,6 +470,27 @@ export default function TenantPayments() {
               />
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Rejection Reason Dialog */}
+      <Dialog open={rejectionNote !== null} onOpenChange={(open) => { if (!open) setRejectionNote(null); }}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <XCircle className="h-5 w-5" />
+              Payment Rejected
+            </DialogTitle>
+            <DialogDescription>
+              Your admin provided the following reason for rejecting this payment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-sm text-red-800 dark:text-red-300 whitespace-pre-wrap">
+            {rejectionNote}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Please resubmit your payment proof after addressing the issue above.
+          </p>
         </DialogContent>
       </Dialog>
     </div>

@@ -47,7 +47,7 @@ export interface IStorage {
   getAllPayments(): Promise<Payment[]>;
   createPayment(payment: InsertPayment): Promise<Payment>;
   updatePayment(id: number, payment: Partial<Payment>): Promise<Payment | undefined>;
-  updatePaymentStatus(id: number, status: string): Promise<Payment | undefined>;
+  updatePaymentStatus(id: number, status: string, rejectionNotes?: string): Promise<Payment | undefined>;
   deletePayment(id: number): Promise<void>;
   
   // Maintenance methods
@@ -173,10 +173,16 @@ export class DatabaseStorage implements IStorage {
     return payment || undefined;
   }
 
-  async updatePaymentStatus(id: number, status: string): Promise<Payment | undefined> {
+  async updatePaymentStatus(id: number, status: string, rejectionNotes?: string): Promise<Payment | undefined> {
+    const updateData: Partial<Payment> = { status };
+    if (status === "rejected" && rejectionNotes) {
+      updateData.rejectionNotes = rejectionNotes;
+    } else if (status !== "rejected") {
+      updateData.rejectionNotes = null;
+    }
     const [payment] = await db
       .update(payments)
-      .set({ status })
+      .set(updateData)
       .where(eq(payments.id, id))
       .returning();
     return payment || undefined;

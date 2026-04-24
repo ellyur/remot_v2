@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Clock, Wrench } from "lucide-react";
+import { CheckCircle2, Clock, Wrench, XCircle } from "lucide-react";
 
 interface StatusBadgeProps {
   status: string;
@@ -15,6 +15,8 @@ export function StatusBadge({ status }: StatusBadgeProps) {
         return <Clock className="h-3 w-3" />;
       case "in progress":
         return <Wrench className="h-3 w-3" />;
+      case "rejected":
+        return <XCircle className="h-3 w-3" />;
       default:
         return null;
     }
@@ -29,6 +31,8 @@ export function StatusBadge({ status }: StatusBadgeProps) {
         return "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800";
       case "in progress":
         return "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800";
+      case "rejected":
+        return "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800";
       default:
         return "";
     }

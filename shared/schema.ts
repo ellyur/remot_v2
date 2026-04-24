@@ -39,7 +39,8 @@ export const payments = pgTable("payments", {
   month: text("month").notNull(), // e.g., "2025-01" for January 2025
   dateUploaded: timestamp("date_uploaded").notNull().defaultNow(),
   imagePath: text("image_path"),
-  status: text("status").notNull().default("pending"), // 'pending', 'verified'
+  status: text("status").notNull().default("pending"), // 'pending', 'verified', 'rejected'
+  rejectionNotes: text("rejection_notes"),
 });
 
 // Maintenance Reports table

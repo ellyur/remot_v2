@@ -113,7 +113,7 @@ export function GCashPaymentDialog({ open, onOpenChange }: GCashPaymentDialogPro
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-[80vw] max-w-lg sm:w-[95vw] sm:max-w-6xl sm:max-h-[90vh] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[80vw] max-w-lg sm:w-[95vw] sm:max-w-6xl sm:max-h-[90vh] max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Smartphone className="h-5 w-5 text-blue-500" />
@@ -128,8 +128,8 @@ export function GCashPaymentDialog({ open, onOpenChange }: GCashPaymentDialogPro
         </DialogHeader>
 
         {step === "info" ? (
-          <div className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-6 sm:space-y-0">
-            <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+          <div className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-6 sm:space-y-0 overflow-x-hidden">
+            <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 min-w-0">
               <CardContent className="pt-6">
                 <div className="text-center space-y-4">
                   <div className="mx-auto bg-white p-2 rounded-lg shadow-md inline-block">
@@ -173,7 +173,7 @@ export function GCashPaymentDialog({ open, onOpenChange }: GCashPaymentDialogPro
               </CardContent>
             </Card>
 
-            <div className="space-y-4 flex flex-col justify-between">
+            <div className="space-y-4 flex flex-col justify-between min-w-0">
               <div className="space-y-4">
                 <div className="pt-4 sm:pt-0">
                   <p className="text-sm text-muted-foreground mb-1">Amount to Pay</p>

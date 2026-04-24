@@ -89,7 +89,21 @@ export async function initializeDatabase() {
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `);
-    
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS reminder_logs (
+        id SERIAL PRIMARY KEY,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        month TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        sent_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS reminder_logs_tenant_month_kind_uidx
+      ON reminder_logs (tenant_id, month, kind)
+    `);
+
     console.log('✓ Database tables ready');
     
     // Check if admin user exists

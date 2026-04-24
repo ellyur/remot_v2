@@ -132,4 +132,27 @@ export class SMSService {
       message,
     });
   }
+
+  static async notifyPaymentDueSoon(
+    tenantPhone: string,
+    tenantName: string,
+    monthLabel: string,
+    amount: string,
+    daysUntilDue: number,
+  ): Promise<any> {
+    const whenPart =
+      daysUntilDue <= 0
+        ? `ay due na ngayong araw`
+        : daysUntilDue === 1
+        ? `ay due na bukas`
+        : `ay due na sa ${daysUntilDue} araw`;
+    const message =
+      `Magandang araw ${tenantName}! Paalala lang po na ang renta ` +
+      `para sa ${monthLabel} (P${amount}) ${whenPart}. ` +
+      `Salamat po sa inyong agarang pagbabayad!`;
+    return this.sendSMS({
+      recipients: tenantPhone,
+      message,
+    });
+  }
 }

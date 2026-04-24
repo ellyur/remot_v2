@@ -1280,6 +1280,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: trigger the automatic reminder job manually (for testing)
+  app.post("/api/admin/run-reminder-job", async (_req, res) => {
+    try {
+      const { runReminderJobNow } = await import("./scheduler");
+      await runReminderJobNow();
+      res.json({ success: true, message: "Reminder job executed" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Send SMS reminder for an unpaid/overdue month
   app.post("/api/payments/remind", async (req, res) => {
     try {

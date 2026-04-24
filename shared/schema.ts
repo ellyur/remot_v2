@@ -70,6 +70,15 @@ export const settings = pgTable("settings", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Reminder logs - records each automatic reminder we sent so we never double-send
+export const reminderLogs = pgTable("reminder_logs", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  month: text("month").notNull(), // YYYY-MM
+  kind: text("kind").notNull(), // 'before_due' | 'overdue'
+  sentAt: timestamp("sent_at").notNull().defaultNow(),
+});
+
 // Relations
 export const unitsRelations = relations(units, ({ many }) => ({
   tenants: many(tenants),

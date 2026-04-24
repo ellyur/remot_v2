@@ -86,6 +86,10 @@ app.use((req, res, next) => {
     
     server.listen(port, host, () => {
       log(`serving on ${host}:${port}`);
+      // Start the daily payment reminder scheduler
+      import("./scheduler")
+        .then(({ startReminderScheduler }) => startReminderScheduler())
+        .catch((err) => console.error("Failed to start scheduler:", err));
     });
   } catch (error) {
     console.error("Failed to start server:", error);

@@ -7,6 +7,7 @@ import {
   kasunduan,
   settings,
   units,
+  reminderLogs,
   type User,
   type InsertUser,
   type Tenant,
@@ -76,6 +77,10 @@ export interface IStorage {
   getSetting(key: string): Promise<Settings | undefined>;
   getAllSettings(): Promise<Settings[]>;
   upsertSetting(key: string, value: string): Promise<Settings>;
+
+  // Reminder log methods
+  hasReminderBeenSent(tenantId: number, month: string, kind: string): Promise<boolean>;
+  logReminderSent(tenantId: number, month: string, kind: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -316,6 +321,29 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  // Reminder log methods
+  async hasReminderBeenSent(tenantId: number, month: string, kind: string): Promise<boolean> {
+    const [row] = await db
+      .select()
+      .from(reminderLogs)
+      .where(
+        and(
+          eq(reminderLogs.tenantId, tenantId),
+          eq(reminderLogs.month, month),
+          eq(reminderLogs.kind, kind),
+        ),
+      )
+      .limit(1);
+    return !!row;
+  }
+
+  async logReminderSent(tenantId: number, month: string, kind: string): Promise<void> {
+    await db
+      .insert(reminderLogs)
+      .values({ tenantId, month, kind })
+      .onConflictDoNothing();
   }
 }
 

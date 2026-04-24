@@ -113,7 +113,7 @@ export function GCashPaymentDialog({ open, onOpenChange }: GCashPaymentDialogPro
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-[95vw] max-w-lg sm:max-w-6xl sm:max-h-[90vh]">
+      <DialogContent className="w-[80vw] max-w-lg sm:w-[95vw] sm:max-w-6xl sm:max-h-[90vh] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Smartphone className="h-5 w-5 text-blue-500" />

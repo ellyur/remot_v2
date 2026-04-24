@@ -18,7 +18,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import type { Tenant, Unit } from "@shared/schema";
 
 const tenantSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
+  // Username is required on create and ignored on edit (the field is disabled).
+  // Allow empty here so editing — which leaves the username blank — passes validation.
+  // The create handler enforces the 3-char minimum manually.
+  username: z.string().refine(
+    (s) => s === "" || s.length >= 3,
+    "Username must be at least 3 characters",
+  ),
   password: z.string(),
   fullName: z.string().min(1, "Full name is required"),
   contact: z.string().min(1, "Contact is required"),
@@ -172,6 +178,13 @@ export default function Tenants() {
     if (editingTenant) {
       updateMutation.mutate({ ...data, id: editingTenant.id });
     } else {
+      if (!data.username || data.username.length < 3) {
+        form.setError("username", {
+          type: "manual",
+          message: "Username must be at least 3 characters",
+        });
+        return;
+      }
       if (!data.password || data.password.length < 6) {
         form.setError("password", {
           type: "manual",

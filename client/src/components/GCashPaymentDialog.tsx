@@ -113,7 +113,7 @@ export function GCashPaymentDialog({ open, onOpenChange }: GCashPaymentDialogPro
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-[95vw] max-w-lg sm:max-w-2xl max-h-[90vh] sm:max-h-none">
+      <DialogContent className="w-[95vw] max-w-lg sm:max-w-4xl sm:max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Smartphone className="h-5 w-5 text-blue-500" />
@@ -128,7 +128,7 @@ export function GCashPaymentDialog({ open, onOpenChange }: GCashPaymentDialogPro
         </DialogHeader>
 
         {step === "info" ? (
-          <div className="space-y-4">
+          <div className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-6 sm:space-y-0">
             <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
               <CardContent className="pt-6">
                 <div className="text-center space-y-4">
@@ -182,25 +182,27 @@ export function GCashPaymentDialog({ open, onOpenChange }: GCashPaymentDialogPro
               </CardContent>
             </Card>
 
-            {settings?.payment_instructions && (
-              <div className="p-4 bg-muted rounded-lg">
-                <p className="text-sm font-medium mb-1">Instructions:</p>
-                <p className="text-sm text-muted-foreground">Send payment to the landlord's GCash account</p>
-              </div>
-            )}
+            <div className="sm:col-span-2 space-y-4">
+              {settings?.payment_instructions && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm font-medium mb-1">Instructions:</p>
+                  <p className="text-sm text-muted-foreground">Send payment to the landlord's GCash account</p>
+                </div>
+              )}
 
-            <DialogFooter>
-              <Button variant="outline" onClick={handleClose}>
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleProceedToUpload}
-                disabled={!settings?.gcash_number}
-                data-testid="button-proceed-upload"
-              >
-                I've Sent the Payment
-              </Button>
-            </DialogFooter>
+              <DialogFooter>
+                <Button variant="outline" onClick={handleClose}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleProceedToUpload}
+                  disabled={!settings?.gcash_number}
+                  data-testid="button-proceed-upload"
+                >
+                  I've Sent the Payment
+                </Button>
+              </DialogFooter>
+            </div>
           </div>
         ) : (
           <Form {...form}>

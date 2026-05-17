@@ -1169,12 +1169,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         year < todayYear ||
         (year === todayYear && monthIdx <= todayMonthIdx);
 
+      // Is this the tenant's very first billing month?
+      const isFirstBillMonth =
+        year === firstBillYear && monthIdx === firstBillMonthIdx;
+
       let status: BillingPeriod["status"];
       if (payment?.status === "verified") status = "paid";
       else if (payment?.status === "pending") status = "pending";
       else if (payment?.status === "rejected") status = "rejected";
       else if (isBeforeFirstBill) status = "n/a";
       else if (!isCurrentOrPastMonth) status = "upcoming";
+      // Never mark the first billing month as "overdue" — the tenant is new and
+      // should be given time to make their first payment without an immediate
+      // overdue flag. Starting from their second billing month, normal overdue
+      // logic applies.
+      else if (isFirstBillMonth) status = "unpaid";
       else status = today > dueDate ? "overdue" : "unpaid";
 
       const daysOverdue =

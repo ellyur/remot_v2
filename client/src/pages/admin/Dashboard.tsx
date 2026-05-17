@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Users, DollarSign, CheckCircle, Clock, Wrench, AlertTriangle, Settings } from "lucide-react";
+import { Users, DollarSign, CheckCircle, Clock, Wrench, AlertTriangle, Settings, CalendarDays } from "lucide-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { StatsCard } from "@/components/StatsCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Tenant } from "@shared/schema";
 
 interface OverduePayment {
@@ -20,7 +22,9 @@ interface DashboardStats {
   totalTenants: number;
   paidRents: number;
   unpaidRents: number;
+  pendingVerification: number;
   pendingMaintenance: number;
+  selectedMonth: string;
   recentPayments: Array<{
     id: number;
     tenant: { fullName: string; unitId: string };
@@ -36,10 +40,28 @@ interface DashboardStats {
   }>;
 }
 
+function buildMonthOptions(): { value: string; label: string }[] {
+  const options: { value: string; label: string }[] = [];
+  const now = new Date();
+  for (let i = 0; i < 13; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = d.toISOString().slice(0, 7);
+    const label = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    options.push({ value, label });
+  }
+  return options;
+}
+
+const MONTH_OPTIONS = buildMonthOptions();
+
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
+  const [selectedMonth, setSelectedMonth] = useState<string>(MONTH_OPTIONS[0].value);
+
   const { data: stats, isLoading } = useQuery<DashboardStats>({
-    queryKey: ["/api/admin/dashboard"],
+    queryKey: ["/api/admin/dashboard", selectedMonth],
+    queryFn: () =>
+      fetch(`/api/admin/dashboard?month=${selectedMonth}`).then(r => r.json()),
   });
 
   const { data: overduePayments } = useQuery<OverduePayment[]>({
@@ -51,6 +73,8 @@ export default function AdminDashboard() {
     const date = new Date(parseInt(year), parseInt(monthNum) - 1);
     return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   };
+
+  const selectedLabel = MONTH_OPTIONS.find(o => o.value === selectedMonth)?.label ?? selectedMonth;
 
   if (isLoading) {
     return (
@@ -70,9 +94,9 @@ export default function AdminDashboard() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button 
+          <Button
             size="sm"
-            className="gap-2" 
+            className="gap-2"
             onClick={() => setLocation("/admin/payments")}
             data-testid="button-manage-payments"
           >
@@ -80,7 +104,7 @@ export default function AdminDashboard() {
             <span className="hidden sm:inline">Manage Payments</span>
             <span className="sm:hidden">Payments</span>
           </Button>
-          <Button 
+          <Button
             variant="outline"
             size="sm"
             className="gap-2"
@@ -91,7 +115,7 @@ export default function AdminDashboard() {
             <span className="hidden sm:inline">Maintenance</span>
             <span className="sm:hidden">Maint.</span>
           </Button>
-          <Button 
+          <Button
             variant="outline"
             size="sm"
             className="gap-2"
@@ -104,15 +128,33 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Month Filter */}
+      <div className="flex items-center gap-3">
+        <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+        <span className="text-sm font-medium text-muted-foreground">Viewing stats for:</span>
+        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          <SelectTrigger className="w-[200px]" data-testid="select-month-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MONTH_OPTIONS.map(opt => (
+              <SelectItem key={opt.value} value={opt.value} data-testid={`month-option-${opt.value}`}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {overduePayments && overduePayments.length > 0 && (
         <Card className="border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                <CardTitle className="text-orange-700 dark:text-orange-400">Overdue Payments</CardTitle>
+                <CardTitle className="text-orange-700 dark:text-orange-400">Overdue Payments Alert</CardTitle>
               </div>
-              <Badge variant="destructive">{overduePayments.length} overdue</Badge>
+              <Badge variant="destructive">{overduePayments.length} unpaid months across tenants</Badge>
             </div>
             <CardDescription>
               Tenants with payments past due date
@@ -121,7 +163,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="space-y-2">
               {overduePayments.slice(0, 3).map((item, index) => (
-                <div 
+                <div
                   key={index}
                   className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white dark:bg-background rounded-lg border gap-2"
                   data-testid={`overdue-payment-${index}`}
@@ -134,15 +176,15 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2">
                     <Badge variant="destructive">
-                      {item.daysOverdue} days
+                      {item.daysOverdue} days overdue
                     </Badge>
-                    <p className="text-sm font-semibold">₱{item.rentAmount}</p>
+                    <p className="text-sm font-semibold">₱{parseFloat(item.rentAmount).toLocaleString()}</p>
                   </div>
                 </div>
               ))}
               {overduePayments.length > 3 && (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="w-full text-orange-600"
                   onClick={() => setLocation("/admin/payments")}
                 >
@@ -154,28 +196,29 @@ export default function AdminDashboard() {
         </Card>
       )}
 
+      {/* Stats for selected month */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
           title="Total Tenants"
-          value={stats?.totalTenants || 0}
+          value={stats?.totalTenants ?? 0}
           icon={Users}
           description="Active tenants"
         />
         <StatsCard
           title="Paid Rents"
-          value={stats?.paidRents || 0}
+          value={stats?.paidRents ?? 0}
           icon={CheckCircle}
-          description="This month"
+          description={selectedLabel}
         />
         <StatsCard
           title="Unpaid Rents"
-          value={stats?.unpaidRents || 0}
+          value={stats?.unpaidRents ?? 0}
           icon={Clock}
-          description="Pending payments"
+          description={`${stats?.pendingVerification ?? 0} pending verification`}
         />
         <StatsCard
           title="Maintenance Requests"
-          value={stats?.pendingMaintenance || 0}
+          value={stats?.pendingMaintenance ?? 0}
           icon={Wrench}
           description="Pending resolution"
         />
@@ -199,7 +242,7 @@ export default function AdminDashboard() {
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{payment.tenant.fullName}</div>
                       <div className="text-sm text-muted-foreground">
-                        Unit {payment.tenant.unitId} • ₱{payment.amount} • {payment.month}
+                        Unit {payment.tenant.unitId} • ₱{parseFloat(payment.amount).toLocaleString()} • {formatMonth(payment.month)}
                       </div>
                     </div>
                     <div className="shrink-0 self-start sm:self-center">
@@ -231,9 +274,9 @@ export default function AdminDashboard() {
                     data-testid={`maintenance-${report.id}`}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{report.tenant.fullName}</div>
+                      <div className="font-medium truncate">{report.tenant?.fullName ?? "Unknown"}</div>
                       <div className="text-sm text-muted-foreground line-clamp-1">
-                        Unit {report.tenant.unitId} • {report.description}
+                        Unit {report.tenant?.unitId ?? "—"} • {report.description}
                       </div>
                     </div>
                     <div className="shrink-0 self-start sm:self-center">

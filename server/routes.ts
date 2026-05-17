@@ -654,14 +654,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paymentsList = await storage.getAllPayments();
       const maintenanceList = await storage.getAllMaintenanceReports();
 
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      const currentMonthPayments = paymentsList.filter(p => p.month === currentMonth);
+      // Use the requested month or default to current month
+      const selectedMonth =
+        typeof req.query.month === "string" && /^\d{4}-\d{2}$/.test(req.query.month)
+          ? req.query.month
+          : new Date().toISOString().slice(0, 7);
+
+      const selectedMonthPayments = paymentsList.filter(p => p.month === selectedMonth);
+
+      // paidRents: tenants with a verified payment for the selected month
+      const paidRents = selectedMonthPayments.filter(p => p.status === "verified").length;
+
+      // unpaidRents: tenants who do NOT have a verified payment for the selected month.
+      // This correctly counts tenants who haven't submitted anything yet, not just
+      // those waiting for verification (which was the old — misleading — logic).
+      const unpaidRents = tenantsList.length - paidRents;
 
       const stats = {
         totalTenants: tenantsList.length,
-        paidRents: currentMonthPayments.filter(p => p.status === "verified").length,
-        unpaidRents: currentMonthPayments.filter(p => p.status === "pending").length,
+        paidRents,
+        unpaidRents,
+        pendingVerification: selectedMonthPayments.filter(p => p.status === "pending").length,
         pendingMaintenance: maintenanceList.filter(r => r.status === "pending").length,
+        selectedMonth,
         recentPayments: await Promise.all(
           paymentsList.slice(0, 5).map(async (payment) => {
             const tenant = payment.tenantId

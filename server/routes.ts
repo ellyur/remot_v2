@@ -775,45 +775,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? ((currentMonthRevenue - lastMonthRevenue) / lastMonthRevenue * 100).toFixed(1)
         : "0";
 
-      // Late Payers Analysis
+      // Late Payers Analysis — uses billing engine to find tenants with overdue months
       const paymentDueDaySetting = await storage.getSetting('payment_due_day');
       const dueDay = paymentDueDaySetting ? parseInt(paymentDueDaySetting.value) : 1;
-      
+      const analyticsToday = new Date();
+      const analyticsCurrentYear = analyticsToday.getFullYear();
+
       const tenantLateCounts: Record<number, { count: number; totalDays: number; tenant: Tenant }> = {};
-      
-      paymentsList.forEach(payment => {
-        if (payment && payment.status === "pending" && payment.month && payment.tenantId) {
-          try {
-            const [year, month] = payment.month.split("-").map(Number);
-            if (isNaN(year) || isNaN(month)) return;
-            
-            const dueDate = new Date(year, month - 1, dueDay);
-            const today = new Date();
-            
-            if (today > dueDate) {
-              const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-              
-              if (!tenantLateCounts[payment.tenantId]) {
-                const tenant = tenantsList.find(t => t && t.id === payment.tenantId);
-                if (tenant) {
-                  tenantLateCounts[payment.tenantId] = {
-                    count: 0,
-                    totalDays: 0,
-                    tenant,
-                  };
-                }
-              }
-              
-              if (tenantLateCounts[payment.tenantId]) {
-                tenantLateCounts[payment.tenantId].count++;
-                tenantLateCounts[payment.tenantId].totalDays += daysOverdue;
-              }
+
+      for (const tenant of tenantsList) {
+        if (!tenant || !tenant.moveInDate) continue;
+        const tenantPayments = paymentsList.filter(p => p && p.tenantId === tenant.id);
+        const moveInYear = new Date(tenant.moveInDate + "T00:00:00").getFullYear();
+
+        let overdueCount = 0;
+        let totalOverdueDays = 0;
+
+        for (let yr = moveInYear; yr <= analyticsCurrentYear; yr++) {
+          const periods = await buildBillingPeriodsForTenant(tenant, tenantPayments, dueDay, analyticsToday, yr);
+          for (const period of periods) {
+            if (period.status === "overdue") {
+              overdueCount++;
+              totalOverdueDays += period.daysOverdue;
             }
-          } catch (error) {
-            console.error("Error processing late payment:", error);
           }
         }
-      });
+
+        if (overdueCount > 0) {
+          tenantLateCounts[tenant.id] = { count: overdueCount, totalDays: totalOverdueDays, tenant };
+        }
+      }
 
       const latePayers = Object.values(tenantLateCounts)
         .filter(item => item && item.tenant && item.count > 0)

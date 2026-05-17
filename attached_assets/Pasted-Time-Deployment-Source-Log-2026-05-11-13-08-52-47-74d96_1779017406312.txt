@@ -1,0 +1,137 @@
+Time
+Deployment
+Source
+Log
+2026-05-11 13:08:52.47
+74d96378
+System
+command finished with error [node dist/index.js]: signal: terminated
+2026-05-17 19:28:41.97
+6ecaa4a2
+User
+at loadESMFromCJS (node:internal/modules/cjs/loader:1363:24)
+2026-05-17 19:28:41.97
+6ecaa4a2
+User
+at Module.require (node:internal/modules/cjs/loader:1289:19)
+2026-05-17 19:28:41.97
+6ecaa4a2
+User
+at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+2026-05-17 19:28:41.97
+6ecaa4a2
+User
+at file:///home/runner/workspace/node_modules/@replit/vite-plugin-runtime-error-modal/dist/index.js:29:1
+2026-05-17 19:28:41.97
+6ecaa4a2
+User
+at Module._compile (node:internal/modules/cjs/loader:1503:5)
+2026-05-17 19:28:41.97
+6ecaa4a2
+User
+module.exports = __toCommonJS(src_exports);
+2026-05-17 19:28:41.97
+6ecaa4a2
+User
+at Module.load (node:internal/modules/cjs/loader:1266:32)
+2026-05-17 19:28:41.97
+6ecaa4a2
+User
+This file is being treated as an ES module because it has a '.js' file extension and '/home/runner/workspace/node_modules/@replit/vite-plugin-runtime-error-modal/package.json' contains "type": "module". To treat it as a CommonJS script, rename it to use the '.cjs' file extension.
+2026-05-17 19:28:41.97
+6ecaa4a2
+User
+^
+2026-05-17 19:28:41.97
+6ecaa4a2
+User
+at Module._load (node:internal/modules/cjs/loader:1091:12)
+2026-05-17 19:28:41.97
+6ecaa4a2
+User
+ReferenceError: module is not defined in ES module scope
+2026-05-17 19:28:41.97
+6ecaa4a2
+User
+Node.js v20.20.0
+2026-05-17 19:28:41.99
+6ecaa4a2
+System
+command finished with error [node ./dist/index.cjs]: exit status 1
+2026-05-17 19:28:44.50
+6ecaa4a2
+User
+The CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+at Module.load (node:internal/modules/cjs/loader:1266:32)
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+module.exports = __toCommonJS(src_exports);
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+at file:///home/runner/workspace/node_modules/@replit/vite-plugin-runtime-error-modal/dist/index.js:29:1
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+^
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+at require (node:internal/modules/helpers:182:18)
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+file:///home/runner/workspace/node_modules/@replit/vite-plugin-runtime-error-modal/dist/index.js:29
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+Node.js v20.20.0
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+at Module._compile (node:internal/modules/cjs/loader:1503:5)
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+at Module._load (node:internal/modules/cjs/loader:1091:12)
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+at loadESMFromCJS (node:internal/modules/cjs/loader:1363:24)
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+at Module.require (node:internal/modules/cjs/loader:1289:19)
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+This file is being treated as an ES module because it has a '.js' file extension and '/home/runner/workspace/node_modules/@replit/vite-plugin-runtime-error-modal/package.json' contains "type": "module". To treat it as a CommonJS script, rename it to use the '.cjs' file extension.
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:389:47)
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+ReferenceError: module is not defined in ES module scope
+2026-05-17 19:28:44.51
+6ecaa4a2
+User
+at ModuleJobSync.runSync (node:internal/modules/esm/module_job:437:37)
+
+2026-05-17 19:28:44.52
+6ecaa4a2
+System
+command finished with error [node ./dist/index.cjs]: exit status 1
+2026-05-17 19:28:50.07
+6ecaa4a2
+System
+crash loop detected

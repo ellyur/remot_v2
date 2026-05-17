@@ -161,7 +161,9 @@ export default function TenantDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold tracking-tight">
-              {billing?.depositAmount ? `₱${billing.depositAmount}` : "—"}
+              {tenant?.rentAmount
+                ? `₱${(parseFloat(tenant.rentAmount) * (Number((tenant as any).depositMonths) || 1)).toFixed(2)}`
+                : "—"}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Held by landlord</p>
           </CardContent>

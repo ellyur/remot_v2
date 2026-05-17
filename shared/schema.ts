@@ -46,6 +46,7 @@ export const payments = pgTable("payments", {
   imagePath: text("image_path"),
   status: text("status").notNull().default("pending"), // 'pending', 'verified', 'rejected'
   rejectionNotes: text("rejection_notes"),
+  isAdvance: boolean("is_advance").notNull().default(false),
 });
 
 // Maintenance Reports table

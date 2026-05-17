@@ -43,6 +43,11 @@ export async function initializeDatabase() {
       ALTER TABLE tenants ADD COLUMN IF NOT EXISTS deposit_months INTEGER NOT NULL DEFAULT 1
     `);
 
+    // Add is_advance flag to payments (idempotent)
+    await db.execute(sql`
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS is_advance BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+
     // Backfill move_in_date from earliest payment month (or today if no payments)
     await db.execute(sql`
       UPDATE tenants t

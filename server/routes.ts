@@ -171,6 +171,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create kasunduan record for the tenant
       await storage.createKasunduan({ tenantId: tenant.id, accepted: false });
 
+      // Auto-create verified advance payment records for advance months
+      const advanceCount = advanceMonths ? parseInt(advanceMonths) : 1;
+      if (advanceCount > 0) {
+        const dueDaySetting = await storage.getSetting("payment_due_day");
+        const dueDay = clampDueDay(dueDaySetting?.value);
+
+        const startDate = new Date(finalMoveInDate + "T00:00:00");
+        let firstBillYear = startDate.getFullYear();
+        let firstBillMonthIdx = startDate.getMonth();
+
+        if (startDate.getDate() > dueDay) {
+          firstBillMonthIdx++;
+          if (firstBillMonthIdx > 11) { firstBillMonthIdx = 0; firstBillYear++; }
+        }
+
+        for (let i = 0; i < advanceCount; i++) {
+          let am = firstBillMonthIdx + i;
+          let ay = firstBillYear;
+          while (am > 11) { am -= 12; ay++; }
+          const advanceMonth = `${ay}-${String(am + 1).padStart(2, "0")}`;
+          await storage.createPayment({
+            tenantId: tenant.id,
+            tenantNameSnapshot: tenant.fullName,
+            unitIdSnapshot: tenant.unitId,
+            amount: tenant.rentAmount,
+            month: advanceMonth,
+            status: "verified",
+            isAdvance: true,
+            imagePath: null,
+            rejectionNotes: null,
+          });
+        }
+      }
+
       res.json({ user, tenant });
     } catch (error: any) {
       res.status(400).json({ message: error.message || "Failed to create tenant" });

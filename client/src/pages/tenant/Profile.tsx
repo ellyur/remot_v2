@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
-import { User, Home, Phone, Briefcase, DollarSign, AlertCircle, Edit, Trash2, FileText } from "lucide-react";
+import { User, Home, Phone, Briefcase, DollarSign, AlertCircle, Edit, Trash2, FileText, ShieldCheck, CalendarCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -139,6 +139,12 @@ export default function TenantProfile() {
     deleteMutation.mutate();
   };
 
+  const depositMonths = Number((tenant as any)?.depositMonths ?? 1) || 1;
+  const advanceMonths = Number((tenant as any)?.advanceMonths ?? 1) || 1;
+  const depositAmount = tenant?.rentAmount
+    ? (parseFloat(tenant.rentAmount) * depositMonths).toFixed(2)
+    : null;
+
   const profileItems = [
     {
       icon: User,
@@ -164,6 +170,16 @@ export default function TenantProfile() {
       icon: DollarSign,
       label: "Monthly Rent",
       value: tenant?.rentAmount ? `₱${tenant.rentAmount}` : "—",
+    },
+    {
+      icon: ShieldCheck,
+      label: "Security Deposit",
+      value: depositAmount ? `₱${depositAmount} (${depositMonths} month${depositMonths > 1 ? "s" : ""})` : "—",
+    },
+    {
+      icon: CalendarCheck,
+      label: "Advance Payment",
+      value: tenant?.rentAmount ? `₱${(parseFloat(tenant.rentAmount) * advanceMonths).toFixed(2)} (${advanceMonths} month${advanceMonths > 1 ? "s" : ""} paid on move-in)` : "—",
     },
     {
       icon: AlertCircle,

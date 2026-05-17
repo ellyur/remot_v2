@@ -32,7 +32,7 @@ interface BillingPeriod {
   monthLabel: string;
   dueDate: string;
   daysOverdue: number;
-  status: "paid" | "pending" | "rejected" | "unpaid" | "overdue" | "upcoming" | "n/a";
+  status: "paid" | "pending" | "rejected" | "unpaid" | "overdue" | "upcoming" | "n/a" | "advance";
   payment: { id: number; amount: string; status: string } | null;
   rentAmount: string;
 }
@@ -70,6 +70,7 @@ export default function TenantPayments() {
 
   // Months the tenant can still pay for: unpaid, overdue, previously rejected,
   // or upcoming (allow pre-paying future months).
+  // Advance months are already covered and should not be payable.
   const payableMonths = (billing?.periods ?? []).filter(
     (p) =>
       p.status === "unpaid" ||

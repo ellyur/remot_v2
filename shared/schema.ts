@@ -30,6 +30,8 @@ export const tenants = pgTable("tenants", {
   rentAmount: decimal("rent_amount", { precision: 10, scale: 2 }).notNull(),
   emergencyContact: text("emergency_contact"),
   moveInDate: date("move_in_date"),
+  advanceMonths: integer("advance_months").notNull().default(1),
+  depositMonths: integer("deposit_months").notNull().default(1),
 });
 
 // Payments table - track payment proofs

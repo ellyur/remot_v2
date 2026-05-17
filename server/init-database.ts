@@ -35,6 +35,14 @@ export async function initializeDatabase() {
       ALTER TABLE tenants ADD COLUMN IF NOT EXISTS move_in_date DATE
     `);
 
+    // Add advance/deposit months columns (idempotent)
+    await db.execute(sql`
+      ALTER TABLE tenants ADD COLUMN IF NOT EXISTS advance_months INTEGER NOT NULL DEFAULT 1
+    `);
+    await db.execute(sql`
+      ALTER TABLE tenants ADD COLUMN IF NOT EXISTS deposit_months INTEGER NOT NULL DEFAULT 1
+    `);
+
     // Backfill move_in_date from earliest payment month (or today if no payments)
     await db.execute(sql`
       UPDATE tenants t

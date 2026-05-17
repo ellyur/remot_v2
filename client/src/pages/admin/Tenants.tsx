@@ -42,6 +42,8 @@ const tenantSchema = z.object({
       "Must be 11 digits starting with 09 (e.g. 09171234567)",
     ),
   moveInDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Move-in date is required"),
+  advanceMonths: z.string().min(1, "Required"),
+  depositMonths: z.string().min(1, "Required"),
 }).refine((data) => {
   if (data.password.length > 0 && data.password.length < 6) {
     return false;
@@ -97,6 +99,8 @@ export default function Tenants() {
       rentAmount: "",
       emergencyContact: "",
       moveInDate: new Date().toISOString().slice(0, 10),
+      advanceMonths: "1",
+      depositMonths: "1",
     },
   });
 
@@ -173,6 +177,8 @@ export default function Tenants() {
       rentAmount: tenant.rentAmount,
       emergencyContact: tenant.emergencyContact || "",
       moveInDate: (tenant as any).moveInDate || new Date().toISOString().slice(0, 10),
+      advanceMonths: String((tenant as any).advanceMonths ?? 1),
+      depositMonths: String((tenant as any).depositMonths ?? 1),
     });
     setIsOpen(true);
   };
@@ -431,6 +437,59 @@ export default function Tenants() {
                           <FormControl>
                             <Input type="date" data-testid="input-move-in-date" {...field} />
                           </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="advanceMonths"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Months Advance</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-advance-months">
+                                <SelectValue placeholder="Select" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {[1, 2, 3, 4, 5, 6].map((n) => (
+                                <SelectItem key={n} value={String(n)}>
+                                  {n} {n === 1 ? "month" : "months"}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">Months paid in advance upon move-in</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="depositMonths"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Months Deposit</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-deposit-months">
+                                <SelectValue placeholder="Select" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {[1, 2, 3].map((n) => (
+                                <SelectItem key={n} value={String(n)}>
+                                  {n} {n === 1 ? "month" : "months"}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">Security deposit held by landlord</p>
                           <FormMessage />
                         </FormItem>
                       )}

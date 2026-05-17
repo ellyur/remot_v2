@@ -132,7 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tenants", async (req, res) => {
     try {
-      const { username, password, fullName, contact, unitId, occupation, rentAmount, emergencyContact, moveInDate } = req.body;
+      const { username, password, fullName, contact, unitId, occupation, rentAmount, emergencyContact, moveInDate, advanceMonths, depositMonths } = req.body;
 
       // Validate user data
       const userData = insertUserSchema.parse({ username, password, role: "tenant" });
@@ -159,6 +159,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rentAmount,
         emergencyContact: emergencyContact || null,
         moveInDate: finalMoveInDate,
+        advanceMonths: advanceMonths ? parseInt(advanceMonths) : 1,
+        depositMonths: depositMonths ? parseInt(depositMonths) : 1,
       });
 
       const tenant = await storage.createTenant(tenantData);
@@ -178,7 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/tenants/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { fullName, contact, unitId, occupation, rentAmount, emergencyContact, password, moveInDate } = req.body;
+      const { fullName, contact, unitId, occupation, rentAmount, emergencyContact, password, moveInDate, advanceMonths, depositMonths } = req.body;
 
       const updateData: any = {};
       if (fullName) updateData.fullName = fullName;
@@ -188,6 +190,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (rentAmount) updateData.rentAmount = rentAmount;
       if (emergencyContact !== undefined) updateData.emergencyContact = emergencyContact || null;
       if (moveInDate && /^\d{4}-\d{2}-\d{2}$/.test(moveInDate)) updateData.moveInDate = moveInDate;
+      if (advanceMonths !== undefined) updateData.advanceMonths = parseInt(advanceMonths);
+      if (depositMonths !== undefined) updateData.depositMonths = parseInt(depositMonths);
 
       const tenant = await storage.updateTenant(id, updateData);
 
@@ -1098,7 +1102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     monthLabel: string; // "March 2026"
     dueDate: string; // ISO
     daysOverdue: number;
-    status: "paid" | "pending" | "rejected" | "unpaid" | "overdue" | "upcoming" | "n/a";
+    status: "paid" | "pending" | "rejected" | "unpaid" | "overdue" | "upcoming" | "n/a" | "advance";
     payment: any | null;
     rentAmount: string;
   };
@@ -1118,7 +1122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   async function buildBillingPeriodsForTenant(
-    tenant: { id: number; rentAmount: string; moveInDate: string | null },
+    tenant: { id: number; rentAmount: string; moveInDate: string | null; advanceMonths?: number | null },
     payments: Array<{ month: string; status: string; [k: string]: any }>,
     dueDay: number,
     today: Date,
@@ -1156,6 +1160,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
+    // Build the set of months covered by advance payment
+    const advanceCount = tenant.advanceMonths ?? 0;
+    const advanceMonthKeys = new Set<string>();
+    for (let i = 0; i < advanceCount; i++) {
+      let am = firstBillMonthIdx + i;
+      let ay = firstBillYear;
+      while (am > 11) { am -= 12; ay++; }
+      advanceMonthKeys.add(`${ay}-${String(am + 1).padStart(2, "0")}`);
+    }
+
     const todayYear = today.getFullYear();
     const todayMonthIdx = today.getMonth();
 
@@ -1179,11 +1193,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isFirstBillMonth =
         year === firstBillYear && monthIdx === firstBillMonthIdx;
 
+      // Is this month covered by the advance payment?
+      const isAdvanceMonth = advanceMonthKeys.has(month);
+
       let status: BillingPeriod["status"];
       if (payment?.status === "verified") status = "paid";
       else if (payment?.status === "pending") status = "pending";
       else if (payment?.status === "rejected") status = "rejected";
       else if (isBeforeFirstBill) status = "n/a";
+      else if (isAdvanceMonth) status = "advance"; // covered by advance payment
       else if (!isCurrentOrPastMonth) status = "upcoming";
       // Never mark the first billing month as "overdue" — the tenant is new and
       // should be given time to make their first payment without an immediate
@@ -1260,7 +1278,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         year,
       );
       const { years } = tenantYearRange((tenant as any).moveInDate ?? null, today);
-      res.json({ tenant, periods, year, availableYears: years });
+      const depositAmount = (parseFloat(tenant.rentAmount) * ((tenant as any).depositMonths ?? 1)).toFixed(2);
+      res.json({ tenant, periods, year, availableYears: years, depositAmount });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1287,7 +1306,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         year,
       );
       const { years } = tenantYearRange((tenant as any).moveInDate ?? null, today);
-      res.json({ tenant, periods, year, availableYears: years });
+      const depositAmount = (parseFloat(tenant.rentAmount) * ((tenant as any).depositMonths ?? 1)).toFixed(2);
+      res.json({ tenant, periods, year, availableYears: years, depositAmount });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

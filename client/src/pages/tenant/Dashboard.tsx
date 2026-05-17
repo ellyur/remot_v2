@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, Wrench, Calendar, Home, Plus, CheckCircle2, Clock, XCircle, MessageSquare } from "lucide-react";
+import { DollarSign, Wrench, Calendar, Home, Plus, CheckCircle2, Clock, XCircle, MessageSquare, ShieldCheck } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,7 @@ interface BillingPeriod {
   monthLabel: string;
   dueDate: string;
   daysOverdue: number;
-  status: "paid" | "pending" | "rejected" | "unpaid" | "overdue" | "upcoming" | "n/a";
+  status: "paid" | "pending" | "rejected" | "unpaid" | "overdue" | "upcoming" | "n/a" | "advance";
   payment: {
     id: number;
     amount: string;
@@ -51,6 +51,7 @@ interface BillingPeriodsResponse {
   periods: BillingPeriod[];
   year: number;
   availableYears: number[];
+  depositAmount: string;
 }
 
 export default function TenantDashboard() {
@@ -151,12 +152,20 @@ export default function TenantDashboard() {
           </CardContent>
         </Card>
 
-        <StatsCard
-          title="Total Payments"
-          value={stats?.totalPayments || 0}
-          icon={Calendar}
-          description="Payment submissions"
-        />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Security Deposit
+            </CardTitle>
+            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold tracking-tight">
+              {billing?.depositAmount ? `₱${billing.depositAmount}` : "—"}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Held by landlord</p>
+          </CardContent>
+        </Card>
 
         <StatsCard
           title="Maintenance Reports"
@@ -208,6 +217,8 @@ export default function TenantDashboard() {
                 const containerClass =
                   status === "paid"
                     ? "bg-green-50/50 dark:bg-green-950/10 border-green-200 dark:border-green-900"
+                    : status === "advance"
+                    ? "bg-blue-50/50 dark:bg-blue-950/10 border-blue-200 dark:border-blue-900"
                     : status === "pending"
                     ? "bg-yellow-50/50 dark:bg-yellow-950/10 border-yellow-200 dark:border-yellow-900"
                     : status === "rejected" || status === "overdue"
@@ -221,6 +232,8 @@ export default function TenantDashboard() {
                 const statusLabel =
                   status === "paid"
                     ? "Paid"
+                    : status === "advance"
+                    ? "Advance"
                     : status === "pending"
                     ? "Pending"
                     : status === "rejected"
@@ -245,6 +258,8 @@ export default function TenantDashboard() {
                       </span>
                       {status === "paid" ? (
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      ) : status === "advance" ? (
+                        <ShieldCheck className="h-4 w-4 text-blue-600" />
                       ) : status === "pending" ? (
                         <Clock className="h-4 w-4 text-yellow-600" />
                       ) : status === "rejected" || status === "overdue" ? (

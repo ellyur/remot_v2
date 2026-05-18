@@ -657,6 +657,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const report = await storage.appendTenantReplyToMessages(id, tenantReply);
       if (!report) return res.status(404).json({ message: "Maintenance report not found" });
+
+      // Notify admin via SMS when tenant replies
+      const tenant = await storage.getTenant(report.tenantId);
+      const adminPhoneSetting = await storage.getSetting("admin_phone");
+      if (tenant && adminPhoneSetting?.value) {
+        await SMSService.notifyMaintenanceTenantReply(adminPhoneSetting.value, tenant.fullName, tenantReply.trim());
+      }
+
       res.json(report);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -678,10 +686,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Maintenance report not found" });
       }
 
-      // Send SMS notification to tenant when status changes
+      // Send SMS notification to tenant
       const tenant = await storage.getTenant(report.tenantId);
       if (tenant && tenant.contact) {
-        await SMSService.notifyMaintenanceUpdate(tenant.contact, tenant.fullName, status);
+        if (adminMessage && adminMessage.trim()) {
+          // Admin sent a message — notify tenant with the message content
+          await SMSService.notifyMaintenanceAdminMessage(tenant.contact, tenant.fullName, adminMessage.trim());
+        } else {
+          // Status-only update — send the generic status update SMS
+          await SMSService.notifyMaintenanceUpdate(tenant.contact, tenant.fullName, status);
+        }
       }
 
       res.json(report);

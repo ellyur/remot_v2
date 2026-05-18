@@ -105,6 +105,22 @@ export class SMSService {
     });
   }
 
+  static async notifyMaintenanceAdminMessage(tenantPhone: string, tenantName: string, adminMessage: string): Promise<any> {
+    const message = `Hello ${tenantName}! May bagong mensahe ang Admin sa inyong maintenance report: "${adminMessage}". Mag-login para sumagot.`;
+    return this.sendSMS({
+      recipients: tenantPhone,
+      message,
+    });
+  }
+
+  static async notifyMaintenanceTenantReply(adminPhone: string, tenantName: string, tenantReply: string): Promise<any> {
+    const message = `May bagong reply si ${tenantName} sa maintenance report: "${tenantReply}". Mag-login para tingnan.`;
+    return this.sendSMS({
+      recipients: adminPhone,
+      message,
+    });
+  }
+
   static async sendAdminNotification(adminPhone: string, message: string): Promise<any> {
     return this.sendSMS({
       recipients: adminPhone,

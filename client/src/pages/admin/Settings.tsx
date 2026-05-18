@@ -24,6 +24,7 @@ const settingsSchema = z.object({
   payment_instructions: z.string().optional(),
   send_payment_reminders: z.string().optional(),
   reminder_days_before: z.string().optional(),
+  admin_phone: z.string().optional(),
 });
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
@@ -111,6 +112,7 @@ export default function AdminSettings() {
       payment_instructions: "Please send payment to the GCash number above and upload the screenshot as proof of payment.",
       send_payment_reminders: "true",
       reminder_days_before: "3",
+      admin_phone: "",
     },
   });
 
@@ -127,6 +129,7 @@ export default function AdminSettings() {
         payment_instructions: settings.payment_instructions || "Please send payment to the GCash number above and upload the screenshot as proof of payment.",
         send_payment_reminders: settings.send_payment_reminders || "true",
         reminder_days_before: settings.reminder_days_before || "3",
+        admin_phone: settings.admin_phone || "",
       });
     }
   }, [settings, form]);
@@ -345,6 +348,27 @@ export default function AdminSettings() {
                               {...field} 
                             />
                           </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="admin_phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Admin SMS Number</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="09xxxxxxxxx"
+                              data-testid="input-admin-phone"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Receives SMS when tenants reply to maintenance reports
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}

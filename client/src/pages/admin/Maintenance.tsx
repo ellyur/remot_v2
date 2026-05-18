@@ -137,7 +137,7 @@ export default function AdminMaintenance() {
       <Card>
         <CardHeader>
           <CardTitle>All Maintenance Reports</CardTitle>
-          <CardDescription>Review and update status of maintenance requests </CardDescription>
+          <CardDescription>Review and update status of maintenance r equests  </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (

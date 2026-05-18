@@ -134,11 +134,10 @@ export default function AdminMaintenance() {
           Track and manage maintenance reports
         </p>
       </div>
-
       <Card>
         <CardHeader>
           <CardTitle>All Maintenance Reports</CardTitle>
-          <CardDescription>Review and update status of maintenance requests</CardDescription>
+          <CardDescription>Review and update status of maintenance requests </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -311,7 +310,6 @@ export default function AdminMaintenance() {
           )}
         </CardContent>
       </Card>
-
       {/* Update Status + Message Dialog */}
       <Dialog open={updateReport !== null} onOpenChange={() => setUpdateReport(null)}>
         <DialogContent className="max-w-lg">
@@ -384,7 +382,6 @@ export default function AdminMaintenance() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       {/* Image viewer */}
       <Dialog open={selectedImage !== null} onOpenChange={() => setSelectedImage(null)}>
         <DialogContent className="max-w-3xl">
@@ -402,7 +399,6 @@ export default function AdminMaintenance() {
           )}
         </DialogContent>
       </Dialog>
-
       {/* Full description viewer */}
       <Dialog open={selectedReport !== null} onOpenChange={() => setSelectedReport(null)}>
         <DialogContent className="max-w-2xl">

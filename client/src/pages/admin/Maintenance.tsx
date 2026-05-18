@@ -237,9 +237,17 @@ export default function AdminMaintenance() {
             </div>
 
             {updateReport && (
-              <div className="rounded-md border bg-muted/40 p-3 space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">Tenant's report</p>
-                <p className="text-sm whitespace-pre-wrap">{updateReport.description}</p>
+              <div className="space-y-2">
+                <div className="rounded-md border bg-muted/40 p-3 space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Tenant's report</p>
+                  <p className="text-sm whitespace-pre-wrap">{updateReport.description}</p>
+                </div>
+                {(updateReport as any).tenantReply && (
+                  <div className="rounded-md border-l-4 border-orange-400 bg-orange-50 dark:bg-orange-950/20 px-3 py-2">
+                    <p className="text-xs font-semibold text-orange-600 dark:text-orange-400 mb-1">Tenant replied</p>
+                    <p className="text-sm whitespace-pre-wrap">{(updateReport as any).tenantReply}</p>
+                  </div>
+                )}
               </div>
             )}
           </div>

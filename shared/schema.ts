@@ -59,6 +59,7 @@ export const maintenanceReports = pgTable("maintenance_reports", {
   status: text("status").notNull().default("pending"), // 'pending', 'in progress', 'resolved'
   adminMessage: text("admin_message"),  // short status message visible to tenant e.g. "papunta na"
   adminNotes: text("admin_notes"),      // internal notes e.g. tools needed, materials to buy
+  tenantReply: text("tenant_reply"),    // tenant's follow-up reply to admin message
 });
 
 // Kasunduan table - track agreement acceptance

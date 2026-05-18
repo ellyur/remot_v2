@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, FileImage, Wrench, Eye, Edit, Trash2, MessageCircle, StickyNote } from "lucide-react";
+import { Plus, FileImage, Wrench, Eye, Edit, Trash2, MessageCircle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -32,6 +32,7 @@ export default function TenantMaintenance() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [viewingReport, setViewingReport] = useState<MaintenanceReport | null>(null);
+  const [replyTexts, setReplyTexts] = useState<Record<number, string>>({});
   const { user, tenant } = useAuth();
   const { toast } = useToast();
 
@@ -104,6 +105,20 @@ export default function TenantMaintenance() {
       queryClient.invalidateQueries({ queryKey: ['/api/tenant/dashboard'], refetchType: 'active' });
       toast({ title: "Maintenance report deleted successfully" });
       setDeleteId(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const replyMutation = useMutation({
+    mutationFn: async ({ id, tenantReply }: { id: number; tenantReply: string }) => {
+      return await apiRequest("PATCH", `/api/maintenance/${id}/reply`, { tenantReply });
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tenant/maintenance'], refetchType: 'active' });
+      toast({ title: "Reply sent" });
+      setReplyTexts((prev) => ({ ...prev, [vars.id]: "" }));
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -228,6 +243,8 @@ export default function TenantMaintenance() {
         ) : reports && reports.length > 0 ? (
           reports.map((report) => {
             const hasAdminMessage = !!(report as any).adminMessage;
+            const existingReply = (report as any).tenantReply ?? "";
+            const replyDraft = replyTexts[report.id] ?? existingReply;
             return (
               <Card key={report.id} data-testid={`card-maintenance-${report.id}`}>
                 <CardContent className="pt-5">
@@ -256,6 +273,46 @@ export default function TenantMaintenance() {
                             <span className="text-xs font-semibold text-primary">Admin Update</span>
                           </div>
                           <p className="text-sm">{(report as any).adminMessage}</p>
+                        </div>
+                      )}
+
+                      {/* Tenant reply — shown after admin has messaged */}
+                      {hasAdminMessage && (
+                        <div className="mt-1 space-y-2">
+                          {existingReply && (
+                            <div className="rounded-md border-l-4 border-muted-foreground/40 bg-muted/40 px-3 py-2">
+                              <p className="text-xs font-semibold text-muted-foreground mb-1">Your reply</p>
+                              <p className="text-sm">{existingReply}</p>
+                            </div>
+                          )}
+                          <div className="flex gap-2 items-end">
+                            <Textarea
+                              placeholder={existingReply ? "Update your reply..." : "Reply to admin (e.g. please come ASAP, lumalala na)..."}
+                              className="min-h-[60px] resize-none text-sm"
+                              value={replyTexts[report.id] ?? ""}
+                              onChange={(e) =>
+                                setReplyTexts((prev) => ({ ...prev, [report.id]: e.target.value }))
+                              }
+                              data-testid={`input-reply-${report.id}`}
+                            />
+                            <Button
+                              size="sm"
+                              className="shrink-0"
+                              disabled={
+                                replyMutation.isPending ||
+                                !(replyTexts[report.id] ?? "").trim()
+                              }
+                              onClick={() =>
+                                replyMutation.mutate({
+                                  id: report.id,
+                                  tenantReply: replyTexts[report.id] ?? "",
+                                })
+                              }
+                              data-testid={`button-send-reply-${report.id}`}
+                            >
+                              <Send className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>

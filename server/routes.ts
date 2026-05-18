@@ -648,6 +648,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/maintenance/:id/reply", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { tenantReply } = req.body;
+      const report = await storage.updateMaintenanceReport(id, { tenantReply } as any);
+      if (!report) return res.status(404).json({ message: "Maintenance report not found" });
+      res.json(report);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.patch("/api/maintenance/:id/status", async (req, res) => {
     try {
       const id = parseInt(req.params.id);

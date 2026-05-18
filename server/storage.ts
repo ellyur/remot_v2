@@ -50,6 +50,7 @@ export interface IStorage {
   updatePayment(id: number, payment: Partial<Payment>): Promise<Payment | undefined>;
   updatePaymentStatus(id: number, status: string, rejectionNotes?: string): Promise<Payment | undefined>;
   deletePayment(id: number): Promise<void>;
+  deleteAdvancePaymentsByTenantId(tenantId: number): Promise<void>;
   
   // Maintenance methods
   getMaintenanceReport(id: number): Promise<MaintenanceReport | undefined>;
@@ -220,6 +221,12 @@ export class DatabaseStorage implements IStorage {
 
   async deletePayment(id: number): Promise<void> {
     await db.delete(payments).where(eq(payments.id, id));
+  }
+
+  async deleteAdvancePaymentsByTenantId(tenantId: number): Promise<void> {
+    await db.delete(payments).where(
+      and(eq(payments.tenantId, tenantId), eq(payments.isAdvance, true))
+    );
   }
 
   // Maintenance methods

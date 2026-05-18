@@ -229,6 +229,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (advanceMonths !== undefined) updateData.advanceMonths = parseInt(advanceMonths);
       if (depositMonths !== undefined) updateData.depositMonths = parseInt(depositMonths);
 
+      // Fetch existing tenant before update so we can compare advanceMonths / moveInDate
+      const existingTenant = await storage.getTenant(id);
+      if (!existingTenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
       const tenant = await storage.updateTenant(id, updateData);
 
       if (!tenant) {
@@ -239,6 +245,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (password) {
         const hashedPassword = await bcrypt.hash(password, 10);
         await storage.updateUser(tenant.userId, { password: hashedPassword });
+      }
+
+      // Regenerate advance payments if advanceMonths or moveInDate changed
+      const newAdvanceMonths = updateData.advanceMonths ?? (existingTenant as any).advanceMonths ?? 0;
+      const newMoveInDate = updateData.moveInDate ?? (existingTenant as any).moveInDate;
+      const advanceOrDateChanged =
+        (advanceMonths !== undefined && parseInt(advanceMonths) !== ((existingTenant as any).advanceMonths ?? 0)) ||
+        (moveInDate && moveInDate !== (existingTenant as any).moveInDate);
+
+      if (advanceOrDateChanged && newMoveInDate) {
+        // Delete all existing advance payments and recreate with new settings
+        await storage.deleteAdvancePaymentsByTenantId(id);
+
+        const advanceCount = newAdvanceMonths;
+        if (advanceCount > 0) {
+          const dueDaySetting = await storage.getSetting("payment_due_day");
+          // dueDay unused for cutoff now — we use day 15
+          const startDate = new Date(newMoveInDate + "T00:00:00");
+          let firstBillYear = startDate.getFullYear();
+          let firstBillMonthIdx = startDate.getMonth();
+
+          if (startDate.getDate() > 15) {
+            firstBillMonthIdx++;
+            if (firstBillMonthIdx > 11) { firstBillMonthIdx = 0; firstBillYear++; }
+          }
+
+          for (let i = 0; i < advanceCount; i++) {
+            let am = firstBillMonthIdx + i;
+            let ay = firstBillYear;
+            while (am > 11) { am -= 12; ay++; }
+            const advanceMonth = `${ay}-${String(am + 1).padStart(2, "0")}`;
+            await storage.createPayment({
+              tenantId: tenant.id,
+              tenantNameSnapshot: tenant.fullName,
+              unitIdSnapshot: tenant.unitId,
+              amount: tenant.rentAmount,
+              month: advanceMonth,
+              status: "verified",
+              isAdvance: true,
+              imagePath: null,
+              rejectionNotes: null,
+            });
+          }
+        }
       }
 
       res.json(tenant);

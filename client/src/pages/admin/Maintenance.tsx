@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Eye, Wrench, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
+import { Eye, Wrench, MessageSquare, ChevronDown, ChevronUp, Send } from "lucide-react";
 import { DataTablePagination } from "@/components/DataTablePagination";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +59,8 @@ export default function AdminMaintenance() {
   const [updateMessage, setUpdateMessage] = useState("");
   const [updateNotes, setUpdateNotes] = useState("");
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
+  const [inlineReply, setInlineReply] = useState<Record<number, string>>({});
+  const [inlineStatus, setInlineStatus] = useState<Record<number, string>>({});
   const { toast } = useToast();
 
   const { data: reports, isLoading } = useQuery<MaintenanceReportWithTenant[]>({
@@ -86,6 +88,21 @@ export default function AdminMaintenance() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
       toast({ title: "Maintenance report updated" });
       setUpdateReport(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const inlineSendMutation = useMutation({
+    mutationFn: async ({ id, status, adminMessage }: { id: number; status: string; adminMessage: string }) => {
+      return await apiRequest("PATCH", `/api/maintenance/${id}/status`, { status, adminMessage, adminNotes: "" });
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/maintenance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
+      toast({ title: "Message sent" });
+      setInlineReply((prev) => ({ ...prev, [vars.id]: "" }));
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -210,13 +227,62 @@ export default function AdminMaintenance() {
                           </TableCell>
                         </TableRow>
                         {isExpanded && (
-                          <TableRow key={`${report.id}-thread`} className="bg-muted/20 hover:bg-muted/20">
-                            <TableCell colSpan={8} className="py-4 px-6">
-                              <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
-                                Conversation — {report.tenant.fullName} (Unit {report.tenant.unitId})
+                          <TableRow className="bg-muted/20 hover:bg-muted/20">
+                            <TableCell colSpan={8} className="py-3 px-6">
+                              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                                {report.tenant.fullName} · Unit {report.tenant.unitId}
                               </p>
-                              <div className="max-h-72 overflow-y-auto pr-1">
-                                <ConversationThread messages={msgs} />
+                              {msgs.length > 0 && (
+                                <div className="max-h-40 overflow-y-auto pr-1 mb-3">
+                                  <ConversationThread messages={msgs} />
+                                </div>
+                              )}
+                              {/* Inline reply for admin */}
+                              <div className="flex gap-2 items-end border-t pt-3">
+                                <Select
+                                  value={inlineStatus[report.id] ?? report.status}
+                                  onValueChange={(v) => setInlineStatus((p) => ({ ...p, [report.id]: v }))}
+                                >
+                                  <SelectTrigger className="w-36 shrink-0 h-9 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                    <SelectItem value="in progress">In Progress</SelectItem>
+                                    <SelectItem value="resolved">Resolved</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  placeholder="Message to tenant..."
+                                  className="h-9 text-sm"
+                                  value={inlineReply[report.id] ?? ""}
+                                  onChange={(e) => setInlineReply((p) => ({ ...p, [report.id]: e.target.value }))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && (inlineReply[report.id] ?? "").trim()) {
+                                      inlineSendMutation.mutate({
+                                        id: report.id,
+                                        status: inlineStatus[report.id] ?? report.status,
+                                        adminMessage: inlineReply[report.id] ?? "",
+                                      });
+                                    }
+                                  }}
+                                  data-testid={`input-inline-reply-${report.id}`}
+                                />
+                                <Button
+                                  size="sm"
+                                  className="shrink-0 h-9"
+                                  disabled={inlineSendMutation.isPending || !(inlineReply[report.id] ?? "").trim()}
+                                  onClick={() =>
+                                    inlineSendMutation.mutate({
+                                      id: report.id,
+                                      status: inlineStatus[report.id] ?? report.status,
+                                      adminMessage: inlineReply[report.id] ?? "",
+                                    })
+                                  }
+                                  data-testid={`button-inline-send-${report.id}`}
+                                >
+                                  <Send className="h-4 w-4" />
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -298,19 +364,9 @@ export default function AdminMaintenance() {
             </div>
 
             {updateReport && (
-              <div className="space-y-2">
-                <div className="rounded-md border bg-muted/40 p-3 space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground mb-1">Tenant's report</p>
-                  <p className="text-sm whitespace-pre-wrap">{updateReport.description}</p>
-                </div>
-                {((updateReport as any).messages ?? []).length > 0 && (
-                  <div className="rounded-md border p-3">
-                    <p className="text-xs font-medium text-muted-foreground mb-2">Conversation history</p>
-                    <div className="max-h-48 overflow-y-auto">
-                      <ConversationThread messages={(updateReport as any).messages ?? []} />
-                    </div>
-                  </div>
-                )}
+              <div className="rounded-md border bg-muted/40 p-3 space-y-1">
+                <p className="text-xs font-medium text-muted-foreground mb-1">Tenant's report</p>
+                <p className="text-sm whitespace-pre-wrap">{updateReport.description}</p>
               </div>
             )}
           </div>

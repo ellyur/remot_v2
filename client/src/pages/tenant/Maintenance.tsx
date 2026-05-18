@@ -277,6 +277,7 @@ export default function TenantMaintenance() {
           reports.map((report) => {
             const msgs: MsgEntry[] = (report as any).messages ?? [];
             const hasMessages = msgs.length > 0;
+            const hasNewMessage = hasMessages && msgs[msgs.length - 1].sender === "admin";
             const isExpanded = expandedCard === report.id;
             return (
               <Card key={report.id} data-testid={`card-maintenance-${report.id}`}>
@@ -285,12 +286,17 @@ export default function TenantMaintenance() {
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusBadge status={report.status} />
-                      {hasMessages && (
+                      {hasNewMessage && !isExpanded ? (
+                        <Badge className="gap-1 text-xs bg-orange-500 hover:bg-orange-500 text-white">
+                          <MessageCircle className="h-3 w-3" />
+                          New Message
+                        </Badge>
+                      ) : hasMessages ? (
                         <Badge variant="secondary" className="gap-1 text-xs">
                           <MessageCircle className="h-3 w-3" />
                           {msgs.length} {msgs.length === 1 ? "message" : "messages"}
                         </Badge>
-                      )}
+                      ) : null}
                       <span className="text-xs text-muted-foreground">
                         {new Date(report.dateReported).toLocaleDateString()}
                       </span>

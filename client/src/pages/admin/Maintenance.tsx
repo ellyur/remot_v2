@@ -160,6 +160,7 @@ export default function AdminMaintenance() {
                 <TableBody>
                   {pagedReports.map((report) => {
                     const msgs: MsgEntry[] = (report as any).messages ?? [];
+                    const hasNewReply = msgs.length > 0 && msgs[msgs.length - 1].sender === "tenant";
                     const isExpanded = expandedRow === report.id;
                     return (
                       <Fragment key={report.id}>
@@ -203,14 +204,18 @@ export default function AdminMaintenance() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="gap-1.5"
+                              className={`gap-1.5 ${hasNewReply && !isExpanded ? "text-orange-600 dark:text-orange-400" : ""}`}
                               onClick={() => setExpandedRow(isExpanded ? null : report.id)}
                               data-testid={`button-messages-${report.id}`}
                             >
                               <MessageSquare className="h-4 w-4" />
-                              {msgs.length > 0 && (
+                              {hasNewReply && !isExpanded ? (
+                                <Badge className="h-5 px-1.5 text-xs bg-orange-500 hover:bg-orange-500 text-white">
+                                  New Reply
+                                </Badge>
+                              ) : msgs.length > 0 ? (
                                 <Badge variant="secondary" className="h-5 px-1.5 text-xs">{msgs.length}</Badge>
-                              )}
+                              ) : null}
                               {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                             </Button>
                           </TableCell>

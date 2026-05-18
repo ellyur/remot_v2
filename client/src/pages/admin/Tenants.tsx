@@ -539,6 +539,7 @@ export default function Tenants() {
                       <TableHead>Move-in</TableHead>
                       <TableHead>Occupation</TableHead>
                       <TableHead className="text-right">Monthly Rent</TableHead>
+                      <TableHead className="text-right">Deposit</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -555,6 +556,12 @@ export default function Tenants() {
                         </TableCell>
                         <TableCell>{tenant.occupation || "—"}</TableCell>
                         <TableCell className="text-right font-semibold">₱{tenant.rentAmount}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          ₱{(parseFloat(tenant.rentAmount) * ((tenant as any).depositMonths ?? 1)).toLocaleString()}
+                          <div className="text-xs text-muted-foreground font-normal">
+                            {(tenant as any).depositMonths ?? 1} mo.
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button

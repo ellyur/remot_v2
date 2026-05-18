@@ -58,7 +58,7 @@ export interface IStorage {
   getAllMaintenanceReports(): Promise<MaintenanceReport[]>;
   createMaintenanceReport(report: InsertMaintenanceReport): Promise<MaintenanceReport>;
   updateMaintenanceReport(id: number, report: Partial<MaintenanceReport>): Promise<MaintenanceReport | undefined>;
-  updateMaintenanceStatus(id: number, status: string): Promise<MaintenanceReport | undefined>;
+  updateMaintenanceStatus(id: number, status: string, adminMessage?: string, adminNotes?: string): Promise<MaintenanceReport | undefined>;
   deleteMaintenanceReport(id: number): Promise<void>;
   
   // Kasunduan methods
@@ -261,10 +261,13 @@ export class DatabaseStorage implements IStorage {
     return report || undefined;
   }
 
-  async updateMaintenanceStatus(id: number, status: string): Promise<MaintenanceReport | undefined> {
+  async updateMaintenanceStatus(id: number, status: string, adminMessage?: string, adminNotes?: string): Promise<MaintenanceReport | undefined> {
+    const updateData: any = { status };
+    if (adminMessage !== undefined) updateData.adminMessage = adminMessage;
+    if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
     const [report] = await db
       .update(maintenanceReports)
-      .set({ status })
+      .set(updateData)
       .where(eq(maintenanceReports.id, id))
       .returning();
     return report || undefined;

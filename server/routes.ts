@@ -651,13 +651,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/maintenance/:id/status", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { status } = req.body;
+      const { status, adminMessage, adminNotes } = req.body;
 
       if (!["pending", "in progress", "resolved"].includes(status)) {
         return res.status(400).json({ message: "Invalid status" });
       }
 
-      const report = await storage.updateMaintenanceStatus(id, status);
+      const report = await storage.updateMaintenanceStatus(id, status, adminMessage, adminNotes);
 
       if (!report) {
         return res.status(404).json({ message: "Maintenance report not found" });

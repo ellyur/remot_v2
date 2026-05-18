@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, FileImage, Wrench, Eye, Edit, Trash2 } from "lucide-react";
+import { Plus, FileImage, Wrench, Eye, Edit, Trash2, MessageCircle, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -31,6 +31,7 @@ export default function TenantMaintenance() {
   const [editingReport, setEditingReport] = useState<MaintenanceReport | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [viewingReport, setViewingReport] = useState<MaintenanceReport | null>(null);
   const { user, tenant } = useAuth();
   const { toast } = useToast();
 
@@ -116,20 +117,16 @@ export default function TenantMaintenance() {
       const formData = new FormData();
       formData.append("tenantId", tenant!.id.toString());
       formData.append("description", data.description);
-      
       if (data.image && data.image.length > 0) {
         formData.append("image", data.image[0]);
       }
-
       submitMutation.mutate(formData);
     }
   };
 
   const handleEdit = (report: MaintenanceReport) => {
     setEditingReport(report);
-    form.reset({
-      description: report.description,
-    });
+    form.reset({ description: report.description });
     setIsEditOpen(true);
   };
 
@@ -225,55 +222,55 @@ export default function TenantMaintenance() {
         </Dialog>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>My Reports</CardTitle>
-          <CardDescription>All your maintenance requests</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading reports...</div>
-          ) : reports && reports.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Date Reported</TableHead>
-                    <TableHead>Image</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reports.map((report) => (
-                    <TableRow key={report.id} data-testid={`row-maintenance-${report.id}`}>
-                      <TableCell className="max-w-md">
-                        <div className="line-clamp-2">{report.description}</div>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(report.dateReported).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        {report.imagePath ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedImage(`/${report.imagePath}`)}
-                            data-testid={`button-view-image-${report.id}`}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View
-                          </Button>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">No image</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
+      <div className="space-y-4">
+        {isLoading ? (
+          <div className="text-center py-8 text-muted-foreground">Loading reports...</div>
+        ) : reports && reports.length > 0 ? (
+          reports.map((report) => {
+            const hasAdminMessage = !!(report as any).adminMessage;
+            return (
+              <Card key={report.id} data-testid={`card-maintenance-${report.id}`}>
+                <CardContent className="pt-5">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge status={report.status} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
+                        {hasAdminMessage && (
+                          <Badge variant="secondary" className="gap-1 text-xs">
+                            <MessageCircle className="h-3 w-3" />
+                            Admin replied
+                          </Badge>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(report.dateReported).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      <p className="text-sm leading-relaxed line-clamp-3">{report.description}</p>
+
+                      {/* Admin message — visible to tenant */}
+                      {hasAdminMessage && (
+                        <div className="mt-2 rounded-md border-l-4 border-primary bg-primary/5 px-3 py-2">
+                          <div className="flex items-center gap-1 mb-1">
+                            <MessageCircle className="h-3.5 w-3.5 text-primary" />
+                            <span className="text-xs font-semibold text-primary">Admin Update</span>
+                          </div>
+                          <p className="text-sm">{(report as any).adminMessage}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2 shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setViewingReport(report)}
+                        data-testid={`button-view-maintenance-${report.id}`}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      {report.status === "pending" && (
+                        <>
                           <Button
                             variant="outline"
                             size="sm"
@@ -290,25 +287,73 @@ export default function TenantMaintenance() {
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-12">
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        ) : (
+          <Card>
+            <CardContent className="text-center py-12">
               <Wrench className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="font-semibold mb-2">No maintenance reports</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Submit a report if you're experiencing any maintenance issues
               </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* View full report dialog */}
+      <Dialog open={viewingReport !== null} onOpenChange={() => setViewingReport(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Maintenance Report</DialogTitle>
+          </DialogHeader>
+          {viewingReport && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <StatusBadge status={viewingReport.status} />
+                <span className="text-sm text-muted-foreground">
+                  {new Date(viewingReport.dateReported).toLocaleDateString()}
+                </span>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-1">Your report</p>
+                <p className="text-sm whitespace-pre-wrap">{viewingReport.description}</p>
+              </div>
+
+              {(viewingReport as any).adminMessage && (
+                <div className="rounded-md border-l-4 border-primary bg-primary/5 px-3 py-3 space-y-1">
+                  <div className="flex items-center gap-1">
+                    <MessageCircle className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs font-semibold text-primary">Admin Update</span>
+                  </div>
+                  <p className="text-sm">{(viewingReport as any).adminMessage}</p>
+                </div>
+              )}
+
+              {viewingReport.imagePath && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Attached image</p>
+                  <img
+                    src={`/${viewingReport.imagePath}`}
+                    alt="Maintenance report"
+                    className="max-w-full rounded-lg border"
+                  />
+                </div>
+              )}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
 
+      {/* Edit dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent data-testid="dialog-edit-maintenance">
           <DialogHeader>
@@ -337,15 +382,11 @@ export default function TenantMaintenance() {
                   </FormItem>
                 )}
               />
-
               <DialogFooter>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    setIsEditOpen(false);
-                    setEditingReport(null);
-                  }}
+                  onClick={() => { setIsEditOpen(false); setEditingReport(null); }}
                   data-testid="button-cancel-edit"
                 >
                   Cancel
@@ -363,7 +404,7 @@ export default function TenantMaintenance() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation */}
       <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent data-testid="dialog-delete-maintenance">
           <AlertDialogHeader>
@@ -377,7 +418,7 @@ export default function TenantMaintenance() {
             <AlertDialogAction
               onClick={() => deleteId && handleDelete(deleteId)}
               disabled={deleteMutation.isPending}
-              className="bg-destructive text-destructive-foreground hover-elevate"
+              className="bg-destructive text-destructive-foreground"
               data-testid="button-confirm-delete"
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
@@ -386,7 +427,7 @@ export default function TenantMaintenance() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* View Maintenance Report Image Dialog */}
+      {/* Image viewer */}
       <Dialog open={selectedImage !== null} onOpenChange={() => setSelectedImage(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>

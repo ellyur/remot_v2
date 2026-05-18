@@ -652,7 +652,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const { tenantReply } = req.body;
-      const report = await storage.updateMaintenanceReport(id, { tenantReply } as any);
+      if (!tenantReply || !tenantReply.trim()) {
+        return res.status(400).json({ message: "Reply cannot be empty" });
+      }
+      const report = await storage.appendTenantReplyToMessages(id, tenantReply);
       if (!report) return res.status(404).json({ message: "Maintenance report not found" });
       res.json(report);
     } catch (error: any) {

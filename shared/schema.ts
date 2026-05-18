@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, decimal, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, decimal, date, json } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -57,9 +57,10 @@ export const maintenanceReports = pgTable("maintenance_reports", {
   imagePath: text("image_path"),
   dateReported: timestamp("date_reported").notNull().defaultNow(),
   status: text("status").notNull().default("pending"), // 'pending', 'in progress', 'resolved'
-  adminMessage: text("admin_message"),  // short status message visible to tenant e.g. "papunta na"
+  adminMessage: text("admin_message"),  // latest admin message (for backward compat)
   adminNotes: text("admin_notes"),      // internal notes e.g. tools needed, materials to buy
-  tenantReply: text("tenant_reply"),    // tenant's follow-up reply to admin message
+  tenantReply: text("tenant_reply"),    // latest tenant reply (for backward compat)
+  messages: json("messages").$type<Array<{sender: "admin"|"tenant"; text: string; timestamp: string; status?: string}>>().notNull().default([]),
 });
 
 // Kasunduan table - track agreement acceptance

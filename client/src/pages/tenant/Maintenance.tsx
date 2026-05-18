@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, FileImage, Wrench, Eye, Edit, Trash2, MessageCircle, Send } from "lucide-react";
+import { Plus, FileImage, Wrench, Eye, Edit, Trash2, MessageCircle, Send, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -17,6 +17,38 @@ import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { MaintenanceReport } from "@shared/schema";
+
+type MsgEntry = { sender: "admin" | "tenant"; text: string; timestamp: string; status?: string };
+
+function ConversationThread({ messages }: { messages: MsgEntry[] }) {
+  if (!messages || messages.length === 0) {
+    return <p className="text-sm text-muted-foreground italic">No messages yet.</p>;
+  }
+  return (
+    <div className="space-y-2">
+      {messages.map((msg, i) => (
+        <div key={i} className={`flex ${msg.sender === "admin" ? "justify-start" : "justify-end"}`}>
+          <div
+            className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+              msg.sender === "admin"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-foreground"
+            }`}
+          >
+            <p className="font-semibold text-xs mb-0.5 opacity-70">
+              {msg.sender === "admin" ? "Admin" : "You"}
+              {msg.status ? ` · ${msg.status}` : ""}
+            </p>
+            <p className="whitespace-pre-wrap">{msg.text}</p>
+            <p className="text-xs opacity-60 mt-1 text-right">
+              {new Date(msg.timestamp).toLocaleString()}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const reportSchema = z.object({
   description: z.string().min(10, "Description must be at least 10 characters"),
@@ -33,6 +65,7 @@ export default function TenantMaintenance() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [viewingReport, setViewingReport] = useState<MaintenanceReport | null>(null);
   const [replyTexts, setReplyTexts] = useState<Record<number, string>>({});
+  const [expandedCard, setExpandedCard] = useState<number | null>(null);
   const { user, tenant } = useAuth();
   const { toast } = useToast();
 
@@ -242,79 +275,25 @@ export default function TenantMaintenance() {
           <div className="text-center py-8 text-muted-foreground">Loading reports...</div>
         ) : reports && reports.length > 0 ? (
           reports.map((report) => {
-            const hasAdminMessage = !!(report as any).adminMessage;
-            const existingReply = (report as any).tenantReply ?? "";
-            const replyDraft = replyTexts[report.id] ?? existingReply;
+            const msgs: MsgEntry[] = (report as any).messages ?? [];
+            const hasMessages = msgs.length > 0;
+            const isExpanded = expandedCard === report.id;
             return (
               <Card key={report.id} data-testid={`card-maintenance-${report.id}`}>
-                <CardContent className="pt-5">
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <StatusBadge status={report.status} />
-                        {hasAdminMessage && (
-                          <Badge variant="secondary" className="gap-1 text-xs">
-                            <MessageCircle className="h-3 w-3" />
-                            Admin replied
-                          </Badge>
-                        )}
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(report.dateReported).toLocaleDateString()}
-                        </span>
-                      </div>
-
-                      <p className="text-sm leading-relaxed line-clamp-3">{report.description}</p>
-
-                      {/* Admin message — visible to tenant */}
-                      {hasAdminMessage && (
-                        <div className="mt-2 rounded-md border-l-4 border-primary bg-primary/5 px-3 py-2">
-                          <div className="flex items-center gap-1 mb-1">
-                            <MessageCircle className="h-3.5 w-3.5 text-primary" />
-                            <span className="text-xs font-semibold text-primary">Admin Update</span>
-                          </div>
-                          <p className="text-sm">{(report as any).adminMessage}</p>
-                        </div>
+                <CardContent className="pt-5 space-y-3">
+                  {/* Header row */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge status={report.status} />
+                      {hasMessages && (
+                        <Badge variant="secondary" className="gap-1 text-xs">
+                          <MessageCircle className="h-3 w-3" />
+                          {msgs.length} {msgs.length === 1 ? "message" : "messages"}
+                        </Badge>
                       )}
-
-                      {/* Tenant reply — shown after admin has messaged */}
-                      {hasAdminMessage && (
-                        <div className="mt-1 space-y-2">
-                          {existingReply && (
-                            <div className="rounded-md border-l-4 border-muted-foreground/40 bg-muted/40 px-3 py-2">
-                              <p className="text-xs font-semibold text-muted-foreground mb-1">Your reply</p>
-                              <p className="text-sm">{existingReply}</p>
-                            </div>
-                          )}
-                          <div className="flex gap-2 items-end">
-                            <Textarea
-                              placeholder={existingReply ? "Update your reply..." : "Reply to admin (e.g. please come ASAP, lumalala na)..."}
-                              className="min-h-[60px] resize-none text-sm"
-                              value={replyTexts[report.id] ?? ""}
-                              onChange={(e) =>
-                                setReplyTexts((prev) => ({ ...prev, [report.id]: e.target.value }))
-                              }
-                              data-testid={`input-reply-${report.id}`}
-                            />
-                            <Button
-                              size="sm"
-                              className="shrink-0"
-                              disabled={
-                                replyMutation.isPending ||
-                                !(replyTexts[report.id] ?? "").trim()
-                              }
-                              onClick={() =>
-                                replyMutation.mutate({
-                                  id: report.id,
-                                  tenantReply: replyTexts[report.id] ?? "",
-                                })
-                              }
-                              data-testid={`button-send-reply-${report.id}`}
-                            >
-                              <Send className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(report.dateReported).toLocaleDateString()}
+                      </span>
                     </div>
 
                     <div className="flex gap-2 shrink-0">
@@ -348,6 +327,63 @@ export default function TenantMaintenance() {
                       )}
                     </div>
                   </div>
+
+                  {/* Description */}
+                  <p className="text-sm leading-relaxed">{report.description}</p>
+
+                  {/* Messages dropdown toggle */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-between border border-dashed text-muted-foreground hover:text-foreground"
+                    onClick={() => setExpandedCard(isExpanded ? null : report.id)}
+                    data-testid={`button-toggle-messages-${report.id}`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <MessageCircle className="h-4 w-4" />
+                      {hasMessages ? `Messages (${msgs.length})` : "Messages"}
+                    </span>
+                    {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+
+                  {/* Conversation thread (expandable) */}
+                  {isExpanded && (
+                    <div className="rounded-md border bg-muted/20 p-3 space-y-3">
+                      <div className="max-h-64 overflow-y-auto">
+                        <ConversationThread messages={msgs} />
+                      </div>
+
+                      {/* Reply input */}
+                      <div className="flex gap-2 items-end pt-1 border-t">
+                        <Textarea
+                          placeholder="Isulat ang reply mo dito..."
+                          className="min-h-[56px] resize-none text-sm"
+                          value={replyTexts[report.id] ?? ""}
+                          onChange={(e) =>
+                            setReplyTexts((prev) => ({ ...prev, [report.id]: e.target.value }))
+                          }
+                          data-testid={`input-reply-${report.id}`}
+                        />
+                        <Button
+                          size="sm"
+                          className="shrink-0"
+                          disabled={
+                            replyMutation.isPending ||
+                            !(replyTexts[report.id] ?? "").trim()
+                          }
+                          onClick={() =>
+                            replyMutation.mutate({
+                              id: report.id,
+                              tenantReply: replyTexts[report.id] ?? "",
+                            })
+                          }
+                          data-testid={`button-send-reply-${report.id}`}
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );

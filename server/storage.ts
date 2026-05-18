@@ -24,7 +24,7 @@ import {
   type InsertUnit,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql as sqlExpr } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -263,11 +263,33 @@ export class DatabaseStorage implements IStorage {
 
   async updateMaintenanceStatus(id: number, status: string, adminMessage?: string, adminNotes?: string): Promise<MaintenanceReport | undefined> {
     const updateData: any = { status };
-    if (adminMessage !== undefined) updateData.adminMessage = adminMessage;
     if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+
+    if (adminMessage && adminMessage.trim()) {
+      // Append message to the messages array
+      updateData.adminMessage = adminMessage;
+      const entry = JSON.stringify({ sender: "admin", text: adminMessage.trim(), timestamp: new Date().toISOString(), status });
+      const [report] = await db
+        .update(maintenanceReports)
+        .set({ ...updateData, messages: sqlExpr`messages || ${entry}::jsonb` } as any)
+        .where(eq(maintenanceReports.id, id))
+        .returning();
+      return report || undefined;
+    }
+
     const [report] = await db
       .update(maintenanceReports)
       .set(updateData)
+      .where(eq(maintenanceReports.id, id))
+      .returning();
+    return report || undefined;
+  }
+
+  async appendTenantReplyToMessages(id: number, tenantReply: string): Promise<MaintenanceReport | undefined> {
+    const entry = JSON.stringify({ sender: "tenant", text: tenantReply.trim(), timestamp: new Date().toISOString() });
+    const [report] = await db
+      .update(maintenanceReports)
+      .set({ tenantReply, messages: sqlExpr`messages || ${entry}::jsonb` } as any)
       .where(eq(maintenanceReports.id, id))
       .returning();
     return report || undefined;

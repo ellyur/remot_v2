@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Eye, Wrench, MessageSquare } from "lucide-react";
+import { Eye, Wrench, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
 import { DataTablePagination } from "@/components/DataTablePagination";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -15,6 +16,41 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { MaintenanceReportWithTenant } from "@shared/schema";
 
+type MsgEntry = { sender: "admin" | "tenant"; text: string; timestamp: string; status?: string };
+
+function ConversationThread({ messages }: { messages: MsgEntry[] }) {
+  if (!messages || messages.length === 0) {
+    return <p className="text-sm text-muted-foreground italic">No messages yet.</p>;
+  }
+  return (
+    <div className="space-y-2">
+      {messages.map((msg, i) => (
+        <div
+          key={i}
+          className={`flex ${msg.sender === "admin" ? "justify-end" : "justify-start"}`}
+        >
+          <div
+            className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+              msg.sender === "admin"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-foreground"
+            }`}
+          >
+            <p className="font-semibold text-xs mb-0.5 opacity-70">
+              {msg.sender === "admin" ? "Admin" : "Tenant"}
+              {msg.status ? ` · ${msg.status}` : ""}
+            </p>
+            <p className="whitespace-pre-wrap">{msg.text}</p>
+            <p className="text-xs opacity-60 mt-1 text-right">
+              {new Date(msg.timestamp).toLocaleString()}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminMaintenance() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<MaintenanceReportWithTenant | null>(null);
@@ -22,6 +58,7 @@ export default function AdminMaintenance() {
   const [updateStatus, setUpdateStatus] = useState("pending");
   const [updateMessage, setUpdateMessage] = useState("");
   const [updateNotes, setUpdateNotes] = useState("");
+  const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const { toast } = useToast();
 
   const { data: reports, isLoading } = useQuery<MaintenanceReportWithTenant[]>({
@@ -58,8 +95,8 @@ export default function AdminMaintenance() {
   const openUpdateDialog = (report: MaintenanceReportWithTenant) => {
     setUpdateReport(report);
     setUpdateStatus(report.status);
-    setUpdateMessage((report as any).adminMessage ?? "");
-    setUpdateNotes((report as any).adminNotes ?? "");
+    setUpdateMessage("");
+    setUpdateNotes("");
   };
 
   const handleSaveUpdate = () => {
@@ -97,72 +134,96 @@ export default function AdminMaintenance() {
                     <TableHead>Tenant</TableHead>
                     <TableHead>Unit</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead>Date Reported</TableHead>
+                    <TableHead>Date</TableHead>
                     <TableHead>Image</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Message</TableHead>
+                    <TableHead>Messages</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pagedReports.map((report) => (
-                    <TableRow key={report.id} data-testid={`row-maintenance-${report.id}`}>
-                      <TableCell className="font-medium">{report.tenant.fullName}</TableCell>
-                      <TableCell>{report.tenant.unitId}</TableCell>
-                      <TableCell className="max-w-xs">
-                        <div className="line-clamp-2 mb-2">{report.description}</div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedReport(report)}
-                          data-testid={`button-view-description-${report.id}`}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Full
-                        </Button>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(report.dateReported).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        {report.imagePath ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedImage(`/${report.imagePath}`)}
-                            data-testid={`button-view-image-${report.id}`}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View
-                          </Button>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">No image</span>
+                  {pagedReports.map((report) => {
+                    const msgs: MsgEntry[] = (report as any).messages ?? [];
+                    const isExpanded = expandedRow === report.id;
+                    return (
+                      <Fragment key={report.id}>
+                        <TableRow data-testid={`row-maintenance-${report.id}`}>
+                          <TableCell className="font-medium">{report.tenant.fullName}</TableCell>
+                          <TableCell>{report.tenant.unitId}</TableCell>
+                          <TableCell className="max-w-xs">
+                            <div className="line-clamp-2 mb-2">{report.description}</div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedReport(report)}
+                              data-testid={`button-view-description-${report.id}`}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Full
+                            </Button>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {new Date(report.dateReported).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            {report.imagePath ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedImage(`/${report.imagePath}`)}
+                                data-testid={`button-view-image-${report.id}`}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View
+                              </Button>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">No image</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge status={report.status} />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={() => setExpandedRow(isExpanded ? null : report.id)}
+                              data-testid={`button-messages-${report.id}`}
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                              {msgs.length > 0 && (
+                                <Badge variant="secondary" className="h-5 px-1.5 text-xs">{msgs.length}</Badge>
+                              )}
+                              {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                            </Button>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              onClick={() => openUpdateDialog(report)}
+                              data-testid={`button-update-${report.id}`}
+                            >
+                              <MessageSquare className="h-4 w-4 mr-2" />
+                              Update
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow key={`${report.id}-thread`} className="bg-muted/20 hover:bg-muted/20">
+                            <TableCell colSpan={8} className="py-4 px-6">
+                              <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+                                Conversation — {report.tenant.fullName} (Unit {report.tenant.unitId})
+                              </p>
+                              <div className="max-h-72 overflow-y-auto pr-1">
+                                <ConversationThread messages={msgs} />
+                              </div>
+                            </TableCell>
+                          </TableRow>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={report.status} />
-                      </TableCell>
-                      <TableCell className="max-w-[160px]">
-                        {(report as any).adminMessage ? (
-                          <p className="text-sm line-clamp-2 text-muted-foreground">
-                            {(report as any).adminMessage}
-                          </p>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          onClick={() => openUpdateDialog(report)}
-                          data-testid={`button-update-${report.id}`}
-                        >
-                          <MessageSquare className="h-4 w-4 mr-2" />
-                          Update
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                      </Fragment>
+                    );
+                  })}
                 </TableBody>
               </Table>
               <DataTablePagination
@@ -239,13 +300,15 @@ export default function AdminMaintenance() {
             {updateReport && (
               <div className="space-y-2">
                 <div className="rounded-md border bg-muted/40 p-3 space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Tenant's report</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Tenant's report</p>
                   <p className="text-sm whitespace-pre-wrap">{updateReport.description}</p>
                 </div>
-                {(updateReport as any).tenantReply && (
-                  <div className="rounded-md border-l-4 border-orange-400 bg-orange-50 dark:bg-orange-950/20 px-3 py-2">
-                    <p className="text-xs font-semibold text-orange-600 dark:text-orange-400 mb-1">Tenant replied</p>
-                    <p className="text-sm whitespace-pre-wrap">{(updateReport as any).tenantReply}</p>
+                {((updateReport as any).messages ?? []).length > 0 && (
+                  <div className="rounded-md border p-3">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Conversation history</p>
+                    <div className="max-h-48 overflow-y-auto">
+                      <ConversationThread messages={(updateReport as any).messages ?? []} />
+                    </div>
                   </div>
                 )}
               </div>
